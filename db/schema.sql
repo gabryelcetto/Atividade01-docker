@@ -8,6 +8,11 @@
 -- scripts quando /var/lib/mysql ainda está vazio.
 -- ============================================================================
 
+-- Sem isso, o cliente `mysql` usado pelo entrypoint do MySQL pra rodar este
+-- arquivo assume um charset diferente de utf8mb4 pra ler o próprio arquivo e
+-- corrompe silenciosamente todo texto acentuado (double-encoding) ao gravar.
+SET NAMES utf8mb4;
+
 -- ==========================================
 -- TABELAS DE APOIO (listas fechadas / lookup)
 -- ==========================================
