@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Resolver ocorrência{% endblock %}
+{% block page_title %}Resolver ocorrência — {{ ocorrencia.equipamento_patrimonio }}{% endblock %}
+{% block page_sub %}Aberta em {{ ocorrencia.data_abertura.strftime('%d/%m/%Y %H:%M') }}{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <div class="tabela-scroll">
+  <table>
+    <thead><tr><th>Problema relatado</th><th>Descrição</th><th>Status</th></tr></thead>
+    <tbody class="stagger">
+    <tr>
+      <td>{{ ocorrencia.problema_relatado }}</td>
+      <td>{{ ocorrencia.descricao or '' }}</td>
+      <td>{{ m.badge_ocorrencia(ocorrencia.status) }}</td>
+    </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% if ocorrencia.status == 'Resolvido' %}
+<div class="panel-empty">Essa ocorrência já foi resolvida.</div>
+{% else %}
+<div class="panel">
+  <form action="{{ url_for('ocorrencias.resolver', id_=ocorrencia.id) }}" method="post">
+    <div class="form-grid">
+      <div class="field full"><label for="solucao_aplicada">Solução aplicada</label>
+        <textarea id="solucao_aplicada" name="solucao_aplicada" rows="3" required></textarea></div>
+      <div class="field"><label for="tecnico_id">Técnico responsável <span style="font-weight:400">(opcional)</span></label>
+        <select id="tecnico_id" name="tecnico_id">
+          <option value="">— não informado —</option>
+          {% for f in funcionarios %}<option value="{{ f.id }}">{{ f.nome }}{% if f.setor %} ({{ f.setor }}){% endif %}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label for="novo_status_equipamento">Novo status do equipamento <span style="font-weight:400">(opcional, normalmente Em uso ou Disponível)</span></label>
+        <select id="novo_status_equipamento" name="novo_status_equipamento">
+          <option value="">— não mudar —</option>
+          {% for s in status_lista %}<option value="{{ s.nome }}">{{ s.nome }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <a href="{{ url_for('ocorrencias.por_equipamento', patrimonio=ocorrencia.equipamento_patrimonio) }}" class="btn ghost">Cancelar</a>
+      <input type="submit" class="btn gold" value="Marcar como resolvida">
+    </div>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

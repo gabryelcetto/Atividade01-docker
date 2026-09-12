@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ funcionario.nome }}{% endblock %}
+{% block page_title %}{{ funcionario.nome }}{% endblock %}
+{% block page_sub %}{{ funcionario.setor or 'sem setor' }}{{ ' · ' + funcionario.cargo if funcionario.cargo }}{% endblock %}
+{% block topbar_extra %}
+<a href="{{ url_for('funcionarios.listar') }}" class="btn ghost">Voltar</a>
+<a href="{{ url_for('funcionarios.editar', id_=funcionario.id) }}" class="btn gold">Editar</a>
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <div class="tabela-scroll">
+  <table>
+    <thead><tr><th>Setor</th><th>Cargo</th><th>E-mail</th><th>Telefone</th></tr></thead>
+    <tbody class="stagger">
+    <tr>
+      <td>{{ funcionario.setor or '—' }}</td>
+      <td>{{ funcionario.cargo or '—' }}</td>
+      <td>{{ funcionario.email or '—' }}</td>
+      <td>{{ funcionario.telefone or '—' }}</td>
+    </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><h2>Equipamentos sob responsabilidade ({{ equipamentos|length }})</h2></div>
+  <div class="tabela-scroll">
+  <table>
+    <thead><tr><th>Patrimônio</th><th>Categoria</th><th>Marca / Modelo</th><th>Local</th><th>Status</th><th></th></tr></thead>
+    <tbody class="stagger">
+    {% for e in equipamentos %}
+    <tr>
+      <td>{{ e.patrimonio }}</td>
+      <td>{{ e.categoria }}</td>
+      <td>{{ e.marca or '' }} {{ e.modelo or '' }}</td>
+      <td>{{ (e.sala + (' / ' + e.mesa if e.mesa else '')) if e.sala else '—' }}</td>
+      <td>{{ m.badge_equipamento(e.status) }}</td>
+      <td><a href="{{ url_for('equipamentos.editar', patrimonio=e.patrimonio) }}" class="btn ghost">Editar</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">Nenhum equipamento sob a responsabilidade dele(a) no momento.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

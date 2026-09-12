@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Equipamentos{% endblock %}
+{% block page_title %}Equipamentos{% endblock %}
+{% block page_sub %}{{ equipamentos|length }} item(ns){% endblock %}
+
+{% block topbar_extra %}
+<form class="search" action="{{ url_for('equipamentos.listar') }}" method="get">
+  {% if categoria_id %}<input type="hidden" name="categoria" value="{{ categoria_id }}">{% elif categoria_id is none and termo %}<input type="hidden" name="categoria" value="todos">{% endif %}
+  {% if filtro %}<input type="hidden" name="filtro" value="{{ filtro }}">{% endif %}
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+  <input name="busca" value="{{ termo }}" placeholder="Buscar patrimônio, marca...">
+</form>
+{% endblock %}
+
+{% block content %}
+<div class="tabs">
+  <a href="{{ url_for('equipamentos.listar', categoria='todos', busca=termo or none) }}" class="tab {{ 'active' if categoria_id is none }}">Todos</a>
+  {% set plural = {'Notebook':'Notebooks', 'Monitor':'Monitores', 'Fone':'Fones'} %}
+  {% for c in categorias %}
+  <a href="{{ url_for('equipamentos.listar', categoria=c.id, busca=termo or none) }}" class="tab {{ 'active' if categoria_id == c.id }}">{{ plural.get(c.nome, c.nome) }}</a>
+  {% endfor %}
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <h2>{{ categorias|selectattr('id','eq',categoria_id)|map(attribute='nome')|first or 'Todos os equipamentos' }}</h2>
+    <form action="{{ url_for('equipamentos.listar') }}" method="get" style="display:flex; gap:8px;">
+      {% if categoria_id %}<input type="hidden" name="categoria" value="{{ categoria_id }}">{% elif categoria_id is none and termo %}<input type="hidden" name="categoria" value="todos">{% endif %}
+      {% if termo %}<input type="hidden" name="busca" value="{{ termo }}">{% endif %}
+      <select name="filtro" class="btn ghost" onchange="this.form.submit()">
+        <option value="">Filtrar coluna por...</option>
+        <option value="patrimonio" {{ 'selected' if filtro=='patrimonio' }}>Patrimônio</option>
+        <option value="marca" {{ 'selected' if filtro=='marca' }}>Marca</option>
+        <option value="responsavel" {{ 'selected' if filtro=='responsavel' }}>Responsável</option>
+        <option value="setor" {{ 'selected' if filtro=='setor' }}>Setor</option>
+        <option value="sala" {{ 'selected' if filtro=='sala' }}>Sala</option>
+        <option value="status" {{ 'selected' if filtro=='status' }}>Status</option>
+        <option value="propriedade" {{ 'selected' if filtro=='propriedade' }}>Propriedade</option>
+      </select>
+    </form>
+    <a href="{{ url_for('equipamentos.cadastro') }}" class="btn gold">+ Novo equipamento</a>
+  </div>
+  <div class="tabela-scroll">
+  <table>
+    <thead><tr>
+      <th>Patrimônio</th>{% if categoria_id is none %}<th>Categoria</th>{% endif %}<th>Marca / Modelo</th><th>Responsável</th>
+      <th>Local</th><th>Status</th><th>Propriedade</th><th></th><th></th><th></th>
+    </tr></thead>
+    <tbody class="stagger">
+    {% for e in equipamentos %}
+    <tr>
+      <td>{{ e.patrimonio }}</td>
+      {% if categoria_id is none %}<td>{{ e.categoria }}</td>{% endif %}
+      <td>{{ e.marca or '' }} {{ e.modelo or '' }}</td>
+      <td>{{ e.responsavel or '—' }}</td>
+      <td>{{ (e.sala + (' / ' + e.mesa if e.mesa else '')) if e.sala else '—' }}</td>
+      <td>{{ m.badge_equipamento(e.status) }}</td>
+      <td>{{ e.propriedade }}</td>
+      <td><a href="{{ url_for('ocorrencias.por_equipamento', patrimonio=e.patrimonio) }}" class="btn ghost">Ocorrências</a></td>
+      <td><a href="{{ url_for('equipamentos.editar', patrimonio=e.patrimonio) }}" class="btn ghost">Editar</a></td>
+      <td><a href="{{ url_for('equipamentos.remover', patrimonio=e.patrimonio) }}" class="btn danger">Remover</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="10">Nenhum equipamento encontrado.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

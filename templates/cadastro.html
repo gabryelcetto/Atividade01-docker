@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Cadastrar equipamento{% endblock %}
+{% block page_title %}Cadastrar equipamento{% endblock %}
+{% block page_sub %}Preencha os dados do novo item{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <form action="{{ url_for('equipamentos.cadastro') }}" method="post">
+    <div class="form-grid">
+      <div class="section-label">Identificação</div>
+      <div class="field"><label for="patrimonio">Patrimônio</label><input id="patrimonio" name="patrimonio" placeholder="Ex: NB0022" required></div>
+      <div class="field"><label for="categoria_id">Categoria</label>
+        <select id="categoria_id" name="categoria_id" required onchange="alternarCampoMac()">
+          <option value="">Selecione...</option>
+          {% for c in categorias %}<option value="{{ c.id }}" data-nome="{{ c.nome }}">{{ c.nome }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label for="marca">Marca</label><input id="marca" name="marca" placeholder="Ex: Dell"></div>
+      <div class="field"><label for="modelo">Modelo</label><input id="modelo" name="modelo" placeholder="Ex: Latitude 5420"></div>
+      <div class="field"><label for="numero_serie">Número de série</label><input id="numero_serie" name="numero_serie"></div>
+      <div class="field" id="campo-endereco-mac"><label for="endereco_mac">Endereço MAC</label><input id="endereco_mac" name="endereco_mac"></div>
+
+      <div class="section-label">Responsável e localização</div>
+      <div class="field">
+        <label for="responsavel_nome">Responsável</label>
+        <input id="responsavel_nome" name="responsavel_nome" list="lista-funcionarios" placeholder="Deixe em branco se ninguém">
+        <datalist id="lista-funcionarios">
+          {% for f in funcionarios %}<option value="{{ f.nome }}">{% endfor %}
+        </datalist>
+      </div>
+      <div class="field"><label for="setor">Setor</label><input id="setor" name="setor" placeholder="Ex: Financeiro"></div>
+      <div class="field"><label for="cargo">Cargo <span style="font-weight:400">(opcional)</span></label><input id="cargo" name="cargo" placeholder="Ex: Líder"></div>
+      <div class="field"><label for="sala">Sala</label><input id="sala" name="sala"></div>
+      <div class="field"><label for="mesa">Mesa</label><input id="mesa" name="mesa"></div>
+
+      <div class="section-label">Status e propriedade</div>
+      <div class="field"><label for="status">Status</label>
+        <select id="status" name="status" required>
+          {% for s in status_lista %}<option value="{{ s.nome }}">{{ s.nome }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label for="propriedade">Propriedade</label>
+        <select id="propriedade" name="propriedade">
+          <option value="Empresa">Empresa</option>
+          <option value="Particular">Particular</option>
+        </select>
+      </div>
+      <div class="field"><label for="data_compra">Data de compra <span style="font-weight:400">(opcional)</span></label><input type="date" id="data_compra" name="data_compra"></div>
+      <div class="field"><label for="garantia_meses">Garantia (meses) <span style="font-weight:400">(opcional)</span></label><input type="number" id="garantia_meses" name="garantia_meses" min="0" placeholder="Ex: 12"></div>
+      <div class="field field-check"><input type="checkbox" id="uso_externo" name="uso_externo"><label for="uso_externo" style="font-weight:400">Uso externo (leva pra casa)</label></div>
+      <div class="field full"><label for="observacao">Observação</label><textarea id="observacao" name="observacao" rows="3"></textarea></div>
+    </div>
+    <div class="form-actions">
+      <a href="{{ url_for('equipamentos.listar') }}" class="btn ghost">Cancelar</a>
+      <input type="submit" class="btn gold" value="Salvar equipamento">
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function alternarCampoMac(){
+  const select = document.getElementById('categoria_id');
+  const campo = document.getElementById('campo-endereco-mac');
+  const nome = select.selectedOptions[0] ? select.selectedOptions[0].dataset.nome : '';
+  const eMonitor = nome === 'Monitor';
+  campo.hidden = eMonitor;
+  if (eMonitor) document.getElementById('endereco_mac').value = '';
+}
+</script>
+{% endblock %}

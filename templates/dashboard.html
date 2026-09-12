@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_sub %}Visão geral do parque de equipamentos{% endblock %}
+
+{% block content %}
+<div class="kpis" id="kpis">
+  <div class="kpi accent" data-value="{{ resumo.total }}"><div class="label">Total de equipamentos</div><div class="value">0</div></div>
+  <div class="kpi" data-value="{{ resumo.em_uso }}"><div class="label">Em uso</div><div class="value">0</div></div>
+  <div class="kpi" data-value="{{ resumo.disponiveis }}"><div class="label">Disponíveis</div><div class="value">0</div></div>
+  <div class="kpi" data-value="{{ resumo.manutencao }}"><div class="label">Em manutenção</div><div class="value">0</div></div>
+  <div class="kpi" data-value="{{ resumo.garantias_vencendo }}"><div class="label">Garantias vencendo (60d)</div><div class="value">0</div></div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <h2>Movimentações recentes</h2>
+    <a href="{{ url_for('equipamentos.listar') }}" class="btn ghost">Ver todos os equipamentos</a>
+  </div>
+  <div class="tabela-scroll">
+  <table>
+    <thead><tr><th>Data</th><th>Patrimônio</th><th>Equipamento</th><th>Responsável</th><th>Local</th><th>Status</th></tr></thead>
+    <tbody class="stagger">
+    {% for mov in movimentacoes %}
+    <tr>
+      <td>{{ mov.data_movimentacao.strftime('%d/%m/%Y %H:%M') }}</td>
+      <td>{{ mov.patrimonio }}</td>
+      <td>{{ mov.marca or '' }} {{ mov.modelo or '' }}</td>
+      <td>{{ mov.responsavel or '—' }}</td>
+      <td>{{ (mov.sala + (' / ' + mov.mesa if mov.mesa else '')) if mov.sala else '—' }}</td>
+      <td>{{ m.badge_equipamento(mov.status) }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">Nenhuma movimentação registrada ainda.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

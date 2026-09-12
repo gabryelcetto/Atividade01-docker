@@ -1,0 +1,11 @@
+{% macro badge_equipamento(nome) -%}
+  {% set classe = {'Em uso':'uso', 'Disponível':'disp', 'Manutenção':'manut',
+                   'Emprestado':'emp', 'Baixado':'baixa'}.get(nome, 'disp') %}
+  <span class="badge {{ classe }}">{{ nome }}</span>
+{%- endmacro %}
+
+{% macro badge_ocorrencia(nome) -%}
+  {% set classe = {'Aberto':'manut', 'Em análise':'uso', 'Em manutenção':'manut',
+                   'Resolvido':'disp'}.get(nome, 'disp') %}
+  <span class="badge {{ classe }}">{{ nome }}</span>
+{%- endmacro %}

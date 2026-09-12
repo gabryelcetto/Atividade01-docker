@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+  <head>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>Tela inicial</title>
+
+  </head>
+
+  <body>
+    <h1 class="faixa">
+    <img class="imagem-faixa" src="{{ url_for('static', filename='images/faixa.png')}}" alt="erro">
+     Controle de Equipamentos
+    </h1>
+
+    <h2 class="text">Em qual patrimonio você quer entrar?</h2>
+
+    <hr>
+    
+  <div class="botoes">
+
+    <div class="botao-inicio">
+    <img class="imagem-inicial" src="{{ url_for('static', filename='images/notebook.png')}}" alt="Erro na geração da imagem">
+    <a href="{{ url_for('equipamentos.listar', slug='notebook') }}" class="botao">Notebooks</a>
+    </div>
+
+    <div class="botao-inicio">
+    <img class="imagem-inicial" src="{{ url_for('static', filename='images/monitor.png')}}" alt="Erro na geração na imagem">
+    <a href="{{ url_for('equipamentos.listar', slug='monitor') }}" class="botao">Monitores</a>
+    </div>
+
+  </div>
+
+  <p style="text-align:center; margin-top:40px;">
+    <a href="{{ url_for('funcionarios.listar') }}" class="botao">Funcionários</a>
+    <a href="{{ url_for('ocorrencias.listar_abertas') }}" class="botao">Ocorrências Abertas</a>
+  </p>
+
+  </body>
+</html>

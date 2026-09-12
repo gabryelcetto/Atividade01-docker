@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Remover equipamento{% endblock %}
+{% block page_title %}Remover {{ equipamento.patrimonio }}{% endblock %}
+{% block page_sub %}{{ equipamento.categoria }}{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <div class="tabela-scroll">
+  <table>
+    <thead><tr><th>Marca</th><th>Modelo</th><th>Responsável</th><th>Setor</th><th>Local</th><th>Status</th></tr></thead>
+    <tbody class="stagger">
+    <tr>
+      <td>{{ equipamento.marca or '' }}</td>
+      <td>{{ equipamento.modelo or '' }}</td>
+      <td>{{ equipamento.responsavel or '—' }}</td>
+      <td>{{ equipamento.setor or '' }}</td>
+      <td>{{ (equipamento.sala + (' / ' + equipamento.mesa if equipamento.mesa else '')) if equipamento.sala else '—' }}</td>
+      <td>{{ m.badge_equipamento(equipamento.status) }}</td>
+    </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <form action="{{ url_for('equipamentos.baixa', patrimonio=equipamento.patrimonio) }}" method="post" class="form-grid" style="grid-template-columns:1fr;">
+    <div class="field">
+      <label for="motivo">Motivo da baixa</label>
+      <input type="text" id="motivo" name="motivo" placeholder="Ex: quebrou, foi doado, substituído" required>
+    </div>
+    <div class="form-actions" style="padding:0;">
+      <input type="submit" class="btn gold" value="Dar baixa (recomendado)">
+    </div>
+  </form>
+
+  <p style="text-align:center; color:var(--text-600); font-size:13px; margin:0 28px 20px;">
+    Dar baixa mantém o histórico do equipamento — ele só sai de uso.
+    Só use "excluir de vez" pra corrigir um cadastro feito errado.
+  </p>
+
+  <div class="form-actions">
+    <a href="{{ url_for('equipamentos.listar') }}" class="btn ghost">Cancelar</a>
+    <form action="{{ url_for('equipamentos.excluir', patrimonio=equipamento.patrimonio) }}" method="post"
+          onsubmit="return confirm('Excluir de vez este cadastro? Isso não pode ser desfeito.');">
+      <input type="submit" class="btn danger" value="Excluir de vez (corrigir cadastro errado)">
+    </form>
+  </div>
+</div>
+{% endblock %}

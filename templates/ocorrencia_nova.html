@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Abrir ocorrência{% endblock %}
+{% block page_title %}Abrir ocorrência{% endblock %}
+{% block page_sub %}{{ equipamento.patrimonio }} · {{ equipamento.marca or '' }} {{ equipamento.modelo or '' }}{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <form action="{{ url_for('ocorrencias.nova', patrimonio=equipamento.patrimonio) }}" method="post">
+    <div class="form-grid">
+      <div class="field full"><label for="problema_relatado">Problema relatado</label>
+        <input id="problema_relatado" name="problema_relatado" required></div>
+      <div class="field full"><label for="descricao">Descrição <span style="font-weight:400">(opcional)</span></label>
+        <textarea id="descricao" name="descricao" rows="3"></textarea></div>
+      <div class="field"><label for="funcionario_id">Relatado por <span style="font-weight:400">(opcional)</span></label>
+        <select id="funcionario_id" name="funcionario_id">
+          <option value="">— não informado —</option>
+          {% for f in funcionarios %}<option value="{{ f.id }}">{{ f.nome }}{% if f.setor %} ({{ f.setor }}){% endif %}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label for="muda_status_para">Já mudar status do equipamento pra <span style="font-weight:400">(opcional)</span></label>
+        <select id="muda_status_para" name="muda_status_para">
+          <option value="">— não mudar —</option>
+          {% for s in status_lista %}<option value="{{ s.nome }}">{{ s.nome }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <a href="{{ url_for('ocorrencias.por_equipamento', patrimonio=equipamento.patrimonio) }}" class="btn ghost">Cancelar</a>
+      <input type="submit" class="btn gold" value="Abrir ocorrência">
+    </div>
+  </form>
+</div>
+{% endblock %}

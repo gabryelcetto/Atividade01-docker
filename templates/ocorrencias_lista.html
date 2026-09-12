@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Ocorrências{% endblock %}
+{% block page_title %}Ocorrências abertas{% endblock %}
+{% block page_sub %}{{ ocorrencias|length }} em aberto, de todos os equipamentos{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <div class="tabela-scroll">
+  <table>
+    <thead><tr><th>Patrimônio</th><th>Problema relatado</th><th>Status</th><th>Relatado por</th><th>Abertura</th><th></th></tr></thead>
+    <tbody class="stagger">
+    {% for o in ocorrencias %}
+    <tr>
+      <td>{{ o.equipamento_patrimonio }}</td>
+      <td>{{ o.problema_relatado }}</td>
+      <td>{{ m.badge_ocorrencia(o.status) }}</td>
+      <td>{{ o.funcionario or '—' }}</td>
+      <td>{{ o.data_abertura.strftime('%d/%m/%Y %H:%M') }}</td>
+      <td><a href="{{ url_for('ocorrencias.resolver', id_=o.id) }}" class="btn gold">Resolver</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">Nenhuma ocorrência aberta no momento.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

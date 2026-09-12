@@ -1,0 +1,985 @@
+{% extends "base.html" %}
+{% block title %}Mapa das Salas{% endblock %}
+{% block page_title %}Mapa das Salas{% endblock %}
+{% block page_sub %}Planta dos escritórios — arraste os blocos pra montar{% endblock %}
+
+{% block topbar_extra %}
+<button class="btn ghost" id="mapa-print-btn" type="button">Imprimir / PDF</button>
+<span class="mapa-status" id="mapa-status">Carregando…</span>
+{% endblock %}
+
+{% block head %}
+<style>
+  .mapa-editor{ --cell:52px; }
+  .mapa-status{ font-size:12px; color:var(--text-600); font-weight:600; white-space:nowrap; }
+  .mapa-status.sujo{ color:#B57A1E; }
+  .mapa-status.erro{ color:#B0473A; }
+
+  .mapa-tabs{
+    display:flex; align-items:center; gap:2px; flex-wrap:wrap;
+    border-bottom:1px solid var(--border); margin-bottom:14px;
+  }
+  .mapa-tab{
+    padding:9px 12px; font-size:13px; font-weight:600; color:var(--text-600);
+    cursor:pointer; border-bottom:2px solid transparent; display:flex; align-items:center; gap:6px;
+  }
+  .mapa-tab.active{ color:var(--navy-900); border-bottom-color:var(--gold-500); }
+  .mapa-tab input{
+    border:none; background:transparent; font:inherit; font-weight:600; color:inherit;
+    width:9ch; max-width:150px; outline:none;
+  }
+  .mapa-tab.active input{ width:auto; min-width:9ch; }
+  .mapa-tab-del{ opacity:.45; font-size:11px; }
+  .mapa-tab-del:hover{ opacity:1; color:#B0473A; }
+  .mapa-tab-add{ padding:8px 12px; color:var(--gold-500); font-weight:700; cursor:pointer; font-size:17px; }
+
+  .mapa-toolbar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .mapa-toolbar .sep{ width:1px; align-self:stretch; background:var(--border); margin:0 2px; }
+  #mapa-save[disabled]{ opacity:.45; cursor:default; }
+
+  .mapa-grade{ display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--text-600); }
+  .mapa-grade button{
+    width:22px; height:22px; border:1px solid var(--border); background:var(--bg); border-radius:5px;
+    cursor:pointer; font-weight:700; color:var(--navy-900); line-height:1;
+  }
+  .mapa-hint{ font-size:11.5px; color:var(--text-600); margin-bottom:12px; }
+
+  #mapa-versoes-painel{
+    border:1px solid var(--border); border-radius:8px; background:var(--card);
+    margin-bottom:12px; max-width:420px; overflow:hidden;
+  }
+  .mapa-versoes-head{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:9px 12px; font-size:12px; font-weight:700; color:var(--text-600);
+    border-bottom:1px solid var(--border);
+  }
+  .mapa-versoes-head button{ border:none; background:none; cursor:pointer; font-size:13px; color:var(--text-600); }
+  #mapa-versoes-lista{ list-style:none; margin:0; padding:6px; max-height:220px; overflow:auto; }
+  #mapa-versoes-lista li{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:6px 8px; font-size:12.5px; border-radius:6px;
+  }
+  #mapa-versoes-lista li:hover{ background:var(--bg); }
+  #mapa-versoes-lista .vazio{ color:var(--text-600); justify-content:flex-start; }
+
+  .mapa-legend{ display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--text-600); margin-bottom:14px; }
+  .mapa-legend span{ display:flex; align-items:center; gap:6px; }
+  .mapa-legend i{ width:12px; height:12px; display:inline-block; }
+  .mapa-legend svg{ width:15px; height:15px; }
+
+  .mapa-canvas-wrap{ overflow:auto; border:1px solid var(--border); border-radius:10px; background:#fff; max-height:72vh; }
+  .mapa-canvas{
+    position:relative;
+    background:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size:var(--cell) var(--cell);
+  }
+
+  .mapa-cell{
+    position:absolute; border-radius:7px; cursor:grab; user-select:none;
+    display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;
+    padding:3px; transition:box-shadow .15s;
+  }
+  .mapa-cell:hover{ box-shadow:0 6px 16px -4px rgba(10,31,53,.25); z-index:9; }
+  .mapa-cell.dragging{ opacity:.9; box-shadow:0 12px 24px -6px rgba(10,31,53,.35); z-index:20; cursor:grabbing; }
+
+  .mapa-cell.mesa{
+    background:#EFE7D9; border:1.5px solid #C9B79A; z-index:1;
+    justify-content:flex-start; align-items:flex-start; padding:5px 7px;
+  }
+  .mapa-cell.mesa .c-code{
+    font-size:10px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+    color:#9A8968; background:rgba(255,255,255,.55); padding:1px 5px; border-radius:4px;
+  }
+
+  .mapa-cell.label{ background:transparent; border:1.5px dashed #B7BDC4; z-index:2; }
+  .mapa-cell.label .c-code{ font-size:10.5px; letter-spacing:1px; text-transform:uppercase; color:var(--text-600); font-weight:700; }
+  .mapa-cell.label .c-sub{ font-size:10px; color:var(--text-600); }
+
+  .mapa-cell.linha{ background:#12181F; border:none; border-radius:3px; padding:0; z-index:3; cursor:move; overflow:visible; }
+  /* área invisível de "pega" ao longo da linha — a linha fina é difícil de clicar */
+  .mapa-cell.linha::before{ content:''; position:absolute; inset:-9px 0; }
+  .mapa-cell.linha:hover{ box-shadow:0 0 0 3px rgba(201,160,99,.4); }
+  .linha-ponta{
+    position:absolute; width:15px; height:15px; margin:-8px 0 0 -8px; border-radius:50%;
+    background:var(--gold-500); border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.45);
+    cursor:crosshair; z-index:12;
+  }
+  .linha-ponta:hover{ background:var(--gold-400); transform:scale(1.25); }
+
+  .mapa-cell.equip{ background:transparent; z-index:5; padding:2px; overflow:visible; }
+  .mapa-cell.equip:hover{ background:rgba(201,160,99,.08); }
+  .mapa-cell.equip .dev{ position:absolute; inset:2px; display:flex; align-items:center; justify-content:center; transition:transform .12s; }
+  .mapa-cell.equip .dev svg{ width:100%; height:100%; color:var(--c-border,#C9A063); }
+  .mapa-cell.equip .dev svg .fill{ fill:var(--c-bg,#FFF8EC); }
+  /* rótulo (código + responsável) flutua abaixo do bloco — sempre legível, não é cortado */
+  .mapa-cell.equip .rotulo{
+    position:absolute; top:100%; left:50%; transform:translateX(-50%); margin-top:3px;
+    white-space:nowrap; text-align:center; pointer-events:none; z-index:8;
+    background:#fff; border:1px solid var(--border); border-radius:5px; padding:2px 7px;
+    box-shadow:0 3px 8px -3px rgba(10,31,53,.3);
+  }
+  .mapa-cell.equip .rotulo .cod{ display:block; font-size:11px; font-weight:800; color:var(--navy-900); line-height:1.2; }
+  .mapa-cell.equip .rotulo .resp{ display:block; font-size:10px; font-weight:600; color:var(--text-600); line-height:1.2; }
+
+  .mapa-cell .resize-handle{
+    position:absolute; right:-4px; bottom:-4px; width:12px; height:12px; border-radius:3px;
+    background:var(--navy-900); cursor:nwse-resize; opacity:0; transition:opacity .15s;
+  }
+  .mapa-cell:hover .resize-handle{ opacity:1; }
+  .mapa-cell .c-del{
+    position:absolute; top:-7px; right:-7px; width:17px; height:17px; border-radius:50%;
+    background:var(--navy-900); color:#fff; font-size:11px; line-height:17px; text-align:center;
+    cursor:pointer; opacity:0; transition:opacity .15s; z-index:2;
+  }
+  .mapa-cell:hover .c-del{ opacity:1; }
+
+  #mapa-ed{
+    position:fixed; z-index:100; background:var(--card); border:1px solid var(--border);
+    border-radius:10px; box-shadow:0 20px 45px -12px rgba(10,31,53,.35); padding:16px; width:270px; display:none;
+    max-height:calc(100vh - 24px); overflow:auto;
+  }
+  #mapa-ed.open{ display:block; }
+  #mapa-ed label{ font-size:11px; font-weight:700; color:var(--text-600); display:block; margin:9px 0 4px; }
+  #mapa-ed input{
+    width:100%; border:1px solid var(--border); border-radius:6px; padding:8px 9px; font-size:13px;
+    font-family:'Inter'; background:var(--bg);
+  }
+  #mapa-ed .match{ font-size:11.5px; color:#2F6B41; margin-top:6px; min-height:15px; }
+  #mapa-ed .match.vazio{ color:var(--text-600); }
+  #mapa-ed .row{ display:flex; gap:6px; margin-top:6px; }
+  #mapa-ed .pick{
+    flex:1; border:1px solid var(--border); border-radius:6px; background:var(--bg); cursor:pointer;
+    padding:7px 0; display:flex; align-items:center; justify-content:center;
+  }
+  #mapa-ed .pick svg{ width:18px; height:18px; color:var(--text-600); }
+  #mapa-ed .pick.sel{ border-color:var(--navy-900); background:#fff; }
+  #mapa-ed .pick.sel svg{ color:var(--navy-900); }
+  #mapa-ed .colors{ display:flex; gap:7px; margin-top:8px; }
+  #mapa-ed .swatch{ width:22px; height:22px; border-radius:50%; cursor:pointer; border:2px solid transparent; }
+  #mapa-ed .swatch.sel{ border-color:var(--navy-900); }
+  #mapa-ed .ed-actions{ display:flex; justify-content:space-between; margin-top:14px; }
+
+  /* ------- impressão ------- */
+  #mapa-print{ display:none; }
+  .mapa-print-sec{ margin-bottom:26px; }
+  .mapa-print-sec h2{ font-family:'Lora',serif; font-size:18px; margin:0 0 10px; }
+  .mapa-print-fit{ overflow:visible; }
+  .mapa-print-canvas{
+    position:relative; border:1px solid #bbb; transform-origin:top left;
+    background:
+      linear-gradient(#e7e2d8 1px, transparent 1px),
+      linear-gradient(90deg,#e7e2d8 1px, transparent 1px);
+  }
+  /* --pe = fator de escala aplicado no canvas; os textos dividem por ele pra
+     compensar e sair com tamanho legível na folha, não importa a escala */
+  .mapa-print-canvas .mapa-cell.equip .rotulo{ box-shadow:none; padding:1px 5px; border-color:#999; }
+  .mapa-print-canvas .mapa-cell.equip .rotulo .cod{ font-size:calc(11px / var(--pe,1)); }
+  .mapa-print-canvas .mapa-cell.equip .rotulo .resp{ font-size:calc(10px / var(--pe,1)); color:#000; font-weight:700; }
+  .mapa-print-canvas .mapa-cell.mesa .c-code,
+  .mapa-print-canvas .mapa-cell.label .c-code{ font-size:calc(10px / var(--pe,1)); }
+  @media print{
+    @page{ size:A4 landscape; margin:8mm; }
+    #app, #mapa-ed, #cursor-ring, #cursor-dot, [data-toast]{ display:none !important; }
+    body{ background:#fff; }
+    #mapa-print{ display:block !important; }
+    .mapa-print-sec{ page-break-after:always; margin-bottom:0; }
+    .mapa-print-sec:last-child{ page-break-after:auto; }
+    .mapa-print-sec h2{ margin:0 0 6px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <div class="mapa-editor" style="padding:18px 20px;">
+
+    <div class="mapa-tabs" id="mapa-tabs"></div>
+
+    <div class="mapa-toolbar">
+      <button class="btn gold" id="mapa-save" disabled>Salvar mapa</button>
+      <span class="sep"></span>
+      <button class="btn ghost" id="mapa-add-mesa">+ Mesa</button>
+      <button class="btn ghost" id="mapa-add-equip">+ Equipamento</button>
+      <button class="btn ghost" id="mapa-add-linha">+ Linha</button>
+      <button class="btn ghost" id="mapa-add-label">+ Rótulo</button>
+      <button class="btn ghost" id="mapa-clear">Limpar sala</button>
+      <span class="sep"></span>
+      <span class="mapa-grade">Tamanho da área
+        <button type="button" data-g="cols-">–</button> largura <button type="button" data-g="cols+">+</button>
+        <button type="button" data-g="rows-">–</button> altura <button type="button" data-g="rows+">+</button>
+      </span>
+    </div>
+
+    <div class="mapa-toolbar">
+      <button class="btn ghost" id="mapa-versoes-btn">Versões anteriores</button>
+      <button class="btn ghost" id="mapa-backup-btn">Baixar backup (.json)</button>
+      <label class="btn ghost" for="mapa-restore-file" style="margin:0;cursor:pointer;">Restaurar de arquivo</label>
+      <input type="file" id="mapa-restore-file" accept="application/json,.json" hidden>
+      <span class="mapa-hint" style="margin:0;">Toda vez que você salva, o mapa anterior fica guardado — dá pra voltar em "Versões anteriores".</span>
+    </div>
+
+    <div id="mapa-versoes-painel" hidden>
+      <div class="mapa-versoes-head">Últimas versões salvas <button type="button" id="mapa-versoes-fechar">✕</button></div>
+      <ul id="mapa-versoes-lista"></ul>
+    </div>
+
+    <div class="mapa-hint">Clique num bloco pra editar · arraste pelo centro pra mover · arraste o cantinho pra redimensionar</div>
+
+    <div class="mapa-legend" id="mapa-legend"></div>
+
+    <div class="mapa-canvas-wrap">
+      <div class="mapa-canvas" id="mapa-canvas"></div>
+    </div>
+  </div>
+</div>
+
+<div id="mapa-ed">
+  <div id="mapa-ed-main-wrap">
+    <label id="mapa-ed-l1">Identificação</label>
+    <input id="mapa-ed-main" list="mapa-patrimonios" autocomplete="off" placeholder="Ex: 0210 ou NB0210">
+    <div class="match vazio" id="mapa-ed-match"></div>
+  </div>
+
+  <div id="mapa-ed-formato-wrap">
+    <label>Formato</label>
+    <div class="row" id="mapa-ed-formatos"></div>
+  </div>
+
+  <div id="mapa-ed-sub-wrap">
+    <label id="mapa-ed-l2">Responsável / observação</label>
+    <input id="mapa-ed-sub" autocomplete="off" placeholder="Ex: nome da pessoa">
+  </div>
+
+  <div class="colors" id="mapa-ed-colors"></div>
+
+  <div id="mapa-ed-linha-wrap">
+    <label>Espessura da linha</label>
+    <div class="row">
+      <button class="btn ghost pequeno" type="button" data-l="esp-">– fina</button>
+      <button class="btn ghost pequeno" type="button" data-l="esp+">+ grossa</button>
+    </div>
+    <p style="font-size:11px;color:var(--text-600);margin:6px 0 0;">
+      Comprimento e ângulo: arraste as <b>bolinhas nas pontas</b> da linha.
+      Arraste o meio pra mover.
+    </p>
+  </div>
+
+  <div id="mapa-ed-girar-wrap">
+    <label>Girar</label>
+    <button class="btn ghost pequeno" id="mapa-ed-girar" type="button">⟳ Girar</button>
+  </div>
+
+  <div class="ed-actions">
+    <button class="btn ghost pequeno" id="mapa-ed-del">Excluir bloco</button>
+    <button class="btn gold pequeno" id="mapa-ed-ok">Concluído</button>
+  </div>
+</div>
+
+<datalist id="mapa-patrimonios">
+  {% for e in equipamentos %}<option value="{{ e.patrimonio }}">{{ e.marca or '' }} {{ e.modelo or '' }}{% if e.responsavel %} — {{ e.responsavel }}{% endif %}</option>{% endfor %}
+</datalist>
+{% endblock %}
+
+{% block scripts %}
+<div id="mapa-print"></div>
+<script>
+window.__MAPA__ = {{ layout | tojson }};
+window.__MAPA_TS__ = {{ atualizado_em | tojson }};
+window.__EQUIP__ = {
+  {% for e in equipamentos %}{{ e.patrimonio | tojson }}: {{ {'responsavel': e.responsavel, 'categoria': e.categoria, 'marca': e.marca, 'modelo': e.modelo} | tojson }}{{ "," if not loop.last }}
+  {% endfor %}
+};
+</script>
+<script>
+(function(){
+  const CELL = 52;
+  const PASSO = CELL / 2;                 // meia célula — encaixe fino ao mover/redimensionar
+  const GRID_PADRAO = {cols:44, rows:28};
+  const GRID_MIN = 16, GRID_MAX = 120, GRID_PASSO = 4;
+  const LINHA_MIN_ESP = 2, LINHA_MAX_ESP = 60, LINHA_PASSO_ESP = 2;
+  const COORD_MAX = GRID_MAX * CELL;
+  const COLORS = [
+    {bg:'#FFF8EC', border:'#C9A063'},
+    {bg:'#E6EFF4', border:'#2C5C7A'},
+    {bg:'#E7F2E9', border:'#2F6B41'},
+    {bg:'#EFEAF6', border:'#5A4B8C'},
+  ];
+  const FORMAS = {
+    notebook: {vb:'1 4 22 18', p:'<path class="fill" d="M4 5.5h16v10H4z"/><path d="M4 5.5h16v10H4zM2 18.5h20l-1.5 2H3.5z"/>'},
+    monitor:  {vb:'2 3 20 18', p:'<path class="fill" d="M3 4h18v11H3z"/><path d="M3 4h18v11H3zM9 20h6M12 15v5"/>'},
+    fone:     {vb:'2 3 20 18', p:'<path class="fill" d="M5 13h3v7H5zM16 13h3v7h-3z"/><path d="M4 15v-3a8 8 0 0 1 16 0v3M5 13h3v7H5a1 1 0 0 1-1-1v-5zM19 13h-3v7h3a1 1 0 0 0 1-1v-5z"/>'},
+    generico: {vb:'3 3 18 18', p:'<path class="fill" d="M4 4h16v16H4z"/><path d="M4 4h16v16H4z"/>'},
+  };
+  const FORMATO_ORDEM = ['notebook','monitor','fone','generico'];
+  const CAT2FORMATO = { 'Notebook':'notebook', 'Monitor':'monitor', 'Fone':'fone' };
+
+  const $ = s => document.querySelector(s);
+  const statusEl = $('#mapa-status');
+  const saveBtn = $('#mapa-save');
+  const canvas = $('#mapa-canvas');
+
+  let state, baseTs = window.__MAPA_TS__ || null;
+
+  function normalizar(layout){
+    const st = (layout && Array.isArray(layout.salas) && layout.salas.length)
+      ? layout : {activeSala:0, salas:[{nome:'Sala 1', cells:[]}]};
+    if(typeof st.activeSala !== 'number' || st.activeSala >= st.salas.length) st.activeSala = 0;
+    if(!st.grid || typeof st.grid.cols !== 'number') st.grid = {...GRID_PADRAO};
+    st.grid.cols = Math.min(GRID_MAX, Math.max(GRID_MIN, st.grid.cols));
+    st.grid.rows = Math.min(GRID_MAX, Math.max(GRID_MIN, st.grid.rows));
+    // A LINHA é definida por duas pontas (x1,y1)-(x2,y2) em pixels + espessura.
+    // Converte qualquer formato antigo pra esse.
+    st.salas.forEach(s => (s.cells || []).forEach(c => {
+      if(c.type !== 'linha' || typeof c.x1 === 'number') return;
+      const px = (typeof c.x === 'number' ? c.x : 1) * CELL;
+      const py = (typeof c.y === 'number' ? c.y : 1) * CELL;
+      const comp = typeof c.linhaW === 'number' ? c.linhaW : (c.w || 6) * CELL;
+      c.esp = Math.max(LINHA_MIN_ESP, typeof c.linhaH === 'number' ? c.linhaH : 6);
+      if(c.rotacao === 90 || c.rotacao === 270){
+        c.x1 = px; c.y1 = py; c.x2 = px; c.y2 = py + comp;
+      }else{
+        c.x1 = px; c.y1 = py + c.esp / 2; c.x2 = px + comp; c.y2 = py + c.esp / 2;
+      }
+      delete c.x; delete c.y; delete c.w; delete c.h;
+      delete c.linhaW; delete c.linhaH; delete c.rotacao;
+    }));
+    return st;
+  }
+
+  state = normalizar(window.__MAPA__);
+
+  // só impede coordenada negativa ou absurda — o canvas cresce pra caber o resto,
+  // então não existe "parede invisível" ao arrastar
+  function clampPosicoes(){
+    const cl = v => Math.max(0, Math.min(GRID_MAX, +v || 0));
+    const clp = v => Math.max(0, Math.min(COORD_MAX, +v || 0));
+    state.salas.forEach(s => (s.cells || []).forEach(c => {
+      if(c.type === 'linha'){
+        c.x1 = clp(c.x1); c.y1 = clp(c.y1); c.x2 = clp(c.x2); c.y2 = clp(c.y2);
+      }else{
+        c.x = cl(c.x); c.y = cl(c.y);
+      }
+    }));
+  }
+  clampPosicoes();
+  let sujo = false;
+  const EQUIP = window.__EQUIP__ || {};
+
+  const newId = () => 'c' + Math.random().toString(36).slice(2, 9);
+  const esc = s => { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
+  const currentSala = () => state.salas[state.activeSala];
+  const svgTag = forma => '<svg viewBox="' + forma.vb + '" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" preserveAspectRatio="xMidYMid meet">' + forma.p + '</svg>';
+  function formatoDoCodigo(codigo){
+    const info = EQUIP[(codigo||'').trim()];
+    if(info && CAT2FORMATO[info.categoria]) return CAT2FORMATO[info.categoria];
+    if(/^nb/i.test(codigo||'')) return 'notebook';
+    return null;
+  }
+
+  $('#mapa-legend').innerHTML =
+    '<span>' + svgTag(FORMAS.notebook) + ' Notebook</span>' +
+    '<span>' + svgTag(FORMAS.monitor) + ' Monitor</span>' +
+    '<span>' + svgTag(FORMAS.fone) + ' Fone</span>' +
+    '<span><i style="background:#E6EFF4;border:1.5px solid #2C5C7A"></i> Grupo A</span>' +
+    '<span><i style="background:#E7F2E9;border:1.5px solid #2F6B41"></i> Grupo B</span>' +
+    '<span><i style="background:#EFEAF6;border:1.5px solid #5A4B8C"></i> Grupo C</span>' +
+    '<span><i style="background:#EFE7D9;border:1.5px solid #C9B79A"></i> Mesa</span>' +
+    '<span><i style="background:#12181F"></i> Divisória</span>' +
+    '<span><i style="background:transparent;border:1.5px dashed #B7BDC4"></i> Rótulo</span>';
+
+  function extremos(c){
+    // (x, y, direita, baixo) em CÉLULAS que o bloco ocupa
+    if(c.type === 'linha'){
+      return [Math.min(c.x1, c.x2) / CELL, Math.min(c.y1, c.y2) / CELL,
+              Math.max(c.x1, c.x2) / CELL, Math.max(c.y1, c.y2) / CELL];
+    }
+    return [c.x, c.y, c.x + (c.w || 0), c.y + (c.h || 0)];
+  }
+  function aplicarGrade(){
+    // o canvas é pelo menos a grade escolhida, mas cresce pra caber qualquer
+    // bloco que passe dela (assim sempre dá pra arrastar de volta)
+    let maxX = state.grid.cols, maxY = state.grid.rows;
+    (currentSala().cells || []).forEach(c => {
+      const [, , dir, bax] = extremos(c);
+      maxX = Math.max(maxX, Math.ceil(dir + 1));
+      maxY = Math.max(maxY, Math.ceil(bax + 1));
+    });
+    canvas.style.width = (maxX * CELL) + 'px';
+    canvas.style.height = (maxY * CELL) + 'px';
+  }
+
+  /* -------------------- estado sujo / salvar ----------------------- */
+  function formatarHora(iso){
+    try{ return new Date(iso).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}); }
+    catch(e){ return ''; }
+  }
+  function pintarStatus(){
+    statusEl.classList.remove('sujo', 'erro');
+    if(sujo){ statusEl.classList.add('sujo'); statusEl.textContent = 'Alterações não salvas'; saveBtn.disabled = false; }
+    else { statusEl.textContent = baseTs ? ('Salvo ' + formatarHora(baseTs)) : 'Nada salvo ainda'; saveBtn.disabled = true; }
+  }
+  function marcarSujo(){ sujo = true; pintarStatus(); }
+
+  let salvando = false;
+  async function salvar(){
+    if(salvando || !sujo) return;
+    salvando = true; saveBtn.disabled = true;
+    statusEl.classList.remove('sujo', 'erro');
+    statusEl.textContent = 'Salvando…';
+    try{
+      const res = await fetch("{{ url_for('mapa.salvar_layout') }}", {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({layout: state, base_atualizado_em: baseTs}),
+      });
+      if(res.status === 409){
+        statusEl.classList.add('erro');
+        statusEl.textContent = 'Outra pessoa alterou o mapa';
+        if(confirm('O mapa foi alterado por outra pessoa desde que você abriu.\n\nRecarregar a versão do servidor? As suas alterações não salvas serão perdidas.')){
+          await recarregar();
+        }else{ sujo = true; pintarStatus(); }
+        return;
+      }
+      const dados = await res.json();
+      if(!res.ok || !dados.ok){
+        statusEl.classList.add('erro');
+        statusEl.textContent = dados.erro || 'Erro ao salvar';
+        sujo = true; saveBtn.disabled = false;
+        return;
+      }
+      baseTs = dados.atualizado_em;
+      sujo = false;
+      pintarStatus();
+    }catch(err){
+      statusEl.classList.add('erro');
+      statusEl.textContent = 'Sem conexão — não salvou';
+      sujo = true; saveBtn.disabled = false;
+    }finally{ salvando = false; }
+  }
+  function aplicarLayout(layout, ts){
+    state = normalizar(layout);
+    baseTs = ts || null;
+    clampPosicoes();
+    sujo = false;
+    pintarStatus(); aplicarGrade(); renderTabs(); renderCanvas();
+  }
+  async function recarregar(){
+    const res = await fetch("{{ url_for('mapa.obter_layout') }}");
+    const dados = await res.json();
+    aplicarLayout(dados.layout, dados.atualizado_em);
+  }
+  saveBtn.addEventListener('click', salvar);
+  window.addEventListener('beforeunload', e => { if(sujo){ e.preventDefault(); e.returnValue = ''; } });
+  pintarStatus();
+
+  /* -------------------- grade (tamanho da área) -------------------- */
+  document.querySelectorAll('.mapa-grade button').forEach(b => b.addEventListener('click', () => {
+    const [eixo, sinal] = [b.dataset.g.slice(0,4), b.dataset.g.slice(4)];
+    const delta = sinal === '+' ? GRID_PASSO : -GRID_PASSO;
+    const alvo = Math.min(GRID_MAX, Math.max(GRID_MIN, state.grid[eixo] + delta));
+    if(alvo === state.grid[eixo]) return;
+    state.grid[eixo] = alvo;
+    clampPosicoes();
+    aplicarGrade(); renderCanvas(); marcarSujo();
+  }));
+
+  /* -------------------- abas de sala ------------------------------- */
+  function renderTabs(){
+    const tabs = $('#mapa-tabs');
+    tabs.innerHTML = '';
+    state.salas.forEach((sala, i) => {
+      const t = document.createElement('div');
+      t.className = 'mapa-tab' + (i === state.activeSala ? ' active' : '');
+      const inp = document.createElement('input');
+      inp.value = sala.nome;
+      inp.addEventListener('click', e => e.stopPropagation());
+      inp.addEventListener('change', () => { sala.nome = inp.value.trim() || 'Sala'; marcarSujo(); renderTabs(); });
+      t.appendChild(inp);
+      if(state.salas.length > 1){
+        const del = document.createElement('span');
+        del.className = 'mapa-tab-del'; del.textContent = '✕'; del.title = 'Remover sala';
+        del.addEventListener('click', e => {
+          e.stopPropagation();
+          if(confirm('Remover a sala "' + sala.nome + '" e todos os blocos dela?')){
+            state.salas.splice(i, 1);
+            if(state.activeSala >= state.salas.length) state.activeSala = state.salas.length - 1;
+            renderTabs(); renderCanvas(); marcarSujo();
+          }
+        });
+        t.appendChild(del);
+      }
+      t.addEventListener('click', () => { state.activeSala = i; renderTabs(); renderCanvas(); });
+      tabs.appendChild(t);
+    });
+    const add = document.createElement('div');
+    add.className = 'mapa-tab-add'; add.textContent = '+'; add.title = 'Adicionar sala';
+    add.addEventListener('click', () => {
+      state.salas.push({nome:'Nova sala', cells:[]});
+      state.activeSala = state.salas.length - 1;
+      renderTabs(); renderCanvas(); marcarSujo();
+    });
+    tabs.appendChild(add);
+  }
+
+  /* -------------------- blocos ------------------------------------ */
+  const RANK = { mesa:0, label:1, linha:2, equip:3 };
+  const ordenadas = cells => [...(cells || [])].sort((a, b) => (RANK[a.type] ?? 4) - (RANK[b.type] ?? 4));
+
+  function posicionar(el, cell, px){
+    px = px || CELL;
+    const fator = px / CELL;
+    if(cell.type === 'linha'){
+      const x1 = cell.x1 * fator, y1 = cell.y1 * fator, x2 = cell.x2 * fator, y2 = cell.y2 * fator;
+      const len = Math.hypot(x2 - x1, y2 - y1);
+      const ang = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+      const esp = Math.max(2, (cell.esp || 6) * fator);
+      el.style.left = x1 + 'px';
+      el.style.top = (y1 - esp / 2) + 'px';
+      el.style.width = len + 'px';
+      el.style.height = esp + 'px';
+      el.style.transformOrigin = '0 50%';
+      el.style.transform = 'rotate(' + ang + 'deg)';
+      return;
+    }
+    el.style.left = (cell.x * px) + 'px';
+    el.style.top = (cell.y * px) + 'px';
+    el.style.width = (cell.w * px - 4) + 'px';
+    el.style.height = (cell.h * px - 4) + 'px';
+  }
+
+  function elementoCelula(cell, opt){
+    opt = opt || {};
+    const el = document.createElement('div');
+    el.className = 'mapa-cell ' + (cell.type || 'equip');
+    el.dataset.id = cell.id;
+    posicionar(el, cell, opt.px);
+
+    const controles = opt.estatico ? '' : '<div class="c-del" title="Excluir">✕</div><div class="resize-handle"></div>';
+
+    if(cell.type === 'equip'){
+      const cor = COLORS[cell.colorIdx || 0];
+      el.style.setProperty('--c-bg', cor.bg);
+      el.style.setProperty('--c-border', cor.border);
+      if(cell.main || cell.sub) el.title = [cell.main, cell.sub].filter(Boolean).join(' — ');
+      el.innerHTML =
+        '<div class="dev">' + svgTag(FORMAS[cell.formato] || FORMAS.generico) + '</div>' +
+        '<div class="rotulo"><span class="cod">' + esc(cell.main || '—') + '</span>' +
+        (cell.sub ? '<span class="resp">' + esc(cell.sub) + '</span>' : '') + '</div>' +
+        controles;
+      if(cell.rotacao) el.querySelector('.dev').style.transform = 'rotate(' + cell.rotacao + 'deg)';
+    }else if(cell.type === 'linha'){
+      el.innerHTML = '';   // arrastar o corpo = mover; as pontas são elementos à parte
+    }else{
+      el.innerHTML =
+        '<div class="c-code">' + esc(cell.main || (cell.type === 'mesa' ? 'Mesa' : 'Rótulo')) + '</div>' +
+        (cell.sub ? '<div class="c-sub">' + esc(cell.sub) + '</div>' : '') +
+        controles;
+    }
+    return el;
+  }
+
+  function pontaLinha(cell, qual){
+    const p = document.createElement('div');
+    p.className = 'linha-ponta';
+    const cx = qual === 1 ? cell.x1 : cell.x2;
+    const cy = qual === 1 ? cell.y1 : cell.y2;
+    p.style.left = cx + 'px';
+    p.style.top = cy + 'px';
+    p.title = 'Arraste pra esticar/encurtar a linha';
+    p.addEventListener('mousedown', e => {
+      e.stopPropagation(); e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      function mv(ev){
+        const nx = Math.max(0, Math.min(COORD_MAX, ev.clientX - rect.left));
+        const ny = Math.max(0, Math.min(COORD_MAX, ev.clientY - rect.top));
+        if(qual === 1){ cell.x1 = nx; cell.y1 = ny; } else { cell.x2 = nx; cell.y2 = ny; }
+        renderCanvas();
+      }
+      function up(){
+        document.removeEventListener('mousemove', mv);
+        document.removeEventListener('mouseup', up);
+        marcarSujo();
+      }
+      document.addEventListener('mousemove', mv);
+      document.addEventListener('mouseup', up);
+    });
+    return p;
+  }
+
+  function renderCanvas(){
+    aplicarGrade();
+    canvas.innerHTML = '';
+    ordenadas(currentSala().cells).forEach(cell => {
+      const el = elementoCelula(cell);
+      canvas.appendChild(el);
+      if(cell.type !== 'linha'){
+        el.querySelector('.c-del').addEventListener('click', e => {
+          e.stopPropagation();
+          currentSala().cells = currentSala().cells.filter(c => c.id !== cell.id);
+          renderCanvas(); marcarSujo();
+        });
+        redimensionavel(el, cell);
+      }else{
+        canvas.appendChild(pontaLinha(cell, 1));
+        canvas.appendChild(pontaLinha(cell, 2));
+      }
+      el.addEventListener('click', e => {
+        if(e.target.classList.contains('resize-handle') || e.target.classList.contains('c-del')) return;
+        if(arrastou){ arrastou = false; return; }
+        abrirEditor(cell, el);
+      });
+      arrastavel(el, cell);
+    });
+  }
+
+  let arrastou = false;
+  function arrastavel(el, cell){
+    el.addEventListener('mousedown', e => {
+      if(e.target.classList.contains('resize-handle') || e.target.classList.contains('c-del')) return;
+      e.preventDefault();
+      arrastou = false;
+      const sx = e.clientX, sy = e.clientY;
+      const ehLinha = cell.type === 'linha';
+      const ox = cell.x, oy = cell.y;
+      const o1x = cell.x1, o1y = cell.y1, o2x = cell.x2, o2y = cell.y2;
+      el.classList.add('dragging');
+      function mv(ev){
+        const dx = ev.clientX - sx, dy = ev.clientY - sy;
+        if(Math.abs(dx) > 4 || Math.abs(dy) > 4) arrastou = true;
+        if(ehLinha){
+          // move as duas pontas juntas, em pixels (sem encaixe, controle total)
+          const shift = (a, d) => Math.max(0, Math.min(COORD_MAX, a + d));
+          cell.x1 = shift(o1x, dx); cell.y1 = shift(o1y, dy);
+          cell.x2 = shift(o2x, dx); cell.y2 = shift(o2y, dy);
+          renderCanvas();
+        }else{
+          // encaixe de meia célula, sem trava à direita/baixo (o canvas cresce)
+          cell.x = Math.max(0, Math.min(GRID_MAX, ox + Math.round(dx / PASSO) / 2));
+          cell.y = Math.max(0, Math.min(GRID_MAX, oy + Math.round(dy / PASSO) / 2));
+          posicionar(el, cell);
+        }
+      }
+      function up(){
+        el.classList.remove('dragging');
+        document.removeEventListener('mousemove', mv);
+        document.removeEventListener('mouseup', up);
+        if(arrastou){ aplicarGrade(); marcarSujo(); }
+      }
+      document.addEventListener('mousemove', mv);
+      document.addEventListener('mouseup', up);
+    });
+  }
+  function redimensionavel(el, cell){
+    el.querySelector('.resize-handle').addEventListener('mousedown', e => {
+      e.stopPropagation(); e.preventDefault();
+      const sx = e.clientX, sy = e.clientY;
+      const ow = cell.w, oh = cell.h;
+      function mv(ev){
+        const dx = ev.clientX - sx, dy = ev.clientY - sy;
+        cell.w = Math.max(1, ow + Math.round(dx / PASSO) / 2);
+        cell.h = Math.max(1, oh + Math.round(dy / PASSO) / 2);
+        posicionar(el, cell);
+      }
+      function up(){
+        document.removeEventListener('mousemove', mv);
+        document.removeEventListener('mouseup', up);
+        aplicarGrade(); marcarSujo();
+      }
+      document.addEventListener('mousemove', mv);
+      document.addEventListener('mouseup', up);
+    });
+  }
+
+  /* -------------------- editor popover --------------------------- */
+  let editando = null;
+  const edMain = $('#mapa-ed-main'), edSub = $('#mapa-ed-sub'), edMatch = $('#mapa-ed-match');
+
+  function renderFormatos(){
+    const wrap = $('#mapa-ed-formatos');
+    wrap.innerHTML = FORMATO_ORDEM.map(f =>
+      '<div class="pick ' + (editando && editando.formato === f ? 'sel' : '') + '" data-f="' + f + '" title="' + f + '">' +
+      svgTag(FORMAS[f]) + '</div>').join('');
+    wrap.querySelectorAll('.pick').forEach(p => p.addEventListener('click', () => {
+      if(!editando) return;
+      editando.formato = p.dataset.f;
+      renderFormatos(); renderCanvas(); marcarSujo();
+    }));
+  }
+
+  function atualizarMatch(){
+    if(!editando || editando.type !== 'equip'){ edMatch.textContent = ''; return; }
+    const info = EQUIP[edMain.value.trim()];
+    if(info){
+      edMatch.classList.remove('vazio');
+      const partes = [info.marca, info.modelo].filter(Boolean).join(' ');
+      edMatch.textContent = '✓ ' + (info.categoria || 'equipamento') +
+        (partes ? ' · ' + partes : '') + (info.responsavel ? ' · ' + info.responsavel : ' · sem responsável');
+      const f = CAT2FORMATO[info.categoria];
+      if(f && editando.formato !== f){ editando.formato = f; renderFormatos(); }
+      if(!edSub.value && info.responsavel){ edSub.value = info.responsavel; editando.sub = info.responsavel; }
+    }else{
+      edMatch.classList.add('vazio');
+      edMatch.textContent = edMain.value.trim()
+        ? 'Não é um patrimônio cadastrado (pode deixar assim mesmo)' : '';
+    }
+  }
+
+  function abrirEditor(cell, el){
+    editando = cell;
+    const ed = $('#mapa-ed');
+    const r = el.getBoundingClientRect();
+    ed.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 282)) + 'px';
+    ed.style.top = Math.max(8, Math.min(r.bottom + 8, window.innerHeight - 360)) + 'px';
+
+    const tipo = cell.type || 'equip';
+    const ehEquip = tipo === 'equip';
+    const ehLinha = tipo === 'linha';
+
+    $('#mapa-ed-main-wrap').style.display = ehLinha ? 'none' : 'block';
+    $('#mapa-ed-sub-wrap').style.display = (ehEquip || tipo === 'label') ? 'block' : 'none';
+    $('#mapa-ed-formato-wrap').style.display = ehEquip ? 'block' : 'none';
+    $('#mapa-ed-colors').style.display = ehEquip ? 'flex' : 'none';
+    $('#mapa-ed-linha-wrap').style.display = ehLinha ? 'block' : 'none';
+    $('#mapa-ed-girar-wrap').style.display = ehEquip ? 'block' : 'none';
+    edMatch.style.display = ehEquip ? 'block' : 'none';
+
+    if(!ehLinha){
+      $('#mapa-ed-l1').textContent = tipo === 'mesa' ? 'Nome da mesa'
+        : tipo === 'label' ? 'Texto do rótulo' : 'Identificação / patrimônio';
+      edMain.value = cell.main || '';
+      if(ehEquip) edMain.setAttribute('list', 'mapa-patrimonios'); else edMain.removeAttribute('list');
+    }
+    $('#mapa-ed-l2').textContent = ehEquip ? 'Responsável / observação' : 'Detalhe (opcional)';
+    edSub.value = cell.sub || '';
+
+    if(ehEquip){
+      if(!cell.formato) cell.formato = formatoDoCodigo(cell.main) || 'generico';
+      renderFormatos();
+      const cw = $('#mapa-ed-colors');
+      cw.innerHTML = COLORS.map((c, i) =>
+        '<div class="swatch ' + (i === (cell.colorIdx || 0) ? 'sel' : '') + '" data-i="' + i + '" style="background:' + c.bg + ';border-color:' + c.border + '"></div>').join('');
+      cw.querySelectorAll('.swatch').forEach(s => s.addEventListener('click', () => {
+        cell.colorIdx = parseInt(s.dataset.i, 10);
+        cw.querySelectorAll('.swatch').forEach(x => x.classList.remove('sel'));
+        s.classList.add('sel');
+        renderCanvas(); marcarSujo();
+      }));
+    }
+
+    atualizarMatch();
+    ed.classList.add('open');
+    if(!ehLinha) edMain.focus();
+  }
+
+  $('#mapa-ed-girar').addEventListener('click', () => {
+    if(!editando || editando.type !== 'equip') return;
+    editando.rotacao = ((editando.rotacao || 0) + 90) % 360;
+    renderCanvas(); marcarSujo();
+  });
+
+  $('#mapa-ed-linha-wrap').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    if(!editando || editando.type !== 'linha') return;
+    const d = b.dataset.l === 'esp+' ? LINHA_PASSO_ESP : -LINHA_PASSO_ESP;
+    editando.esp = Math.max(LINHA_MIN_ESP, Math.min(LINHA_MAX_ESP, (editando.esp || 6) + d));
+    renderCanvas(); marcarSujo();
+  }));
+
+  edMain.addEventListener('input', () => {
+    if(!editando) return;
+    editando.main = edMain.value;
+    if(editando.type === 'equip'){
+      const f = formatoDoCodigo(edMain.value);
+      if(f){ editando.formato = f; renderFormatos(); }
+      atualizarMatch();
+    }
+    renderCanvas(); marcarSujo();
+  });
+  edSub.addEventListener('input', () => { if(editando){ editando.sub = edSub.value; renderCanvas(); marcarSujo(); } });
+  $('#mapa-ed-del').addEventListener('click', () => {
+    if(!editando) return;
+    currentSala().cells = currentSala().cells.filter(c => c.id !== editando.id);
+    $('#mapa-ed').classList.remove('open'); editando = null;
+    renderCanvas(); marcarSujo();
+  });
+  $('#mapa-ed-ok').addEventListener('click', () => {
+    $('#mapa-ed').classList.remove('open'); editando = null;
+  });
+  document.addEventListener('mousedown', e => {
+    const ed = $('#mapa-ed');
+    if(ed.classList.contains('open') && !ed.contains(e.target) && !e.target.closest('.mapa-cell')){
+      ed.classList.remove('open'); editando = null;
+    }
+  });
+
+  /* -------------------- toolbar --------------------------------- */
+  function adicionar(tipo){
+    let base;
+    if(tipo === 'mesa')       base = {id:newId(), type:'mesa',  x:1, y:1, w:4, h:2, main:'', sub:''};
+    else if(tipo === 'linha') base = {id:newId(), type:'linha', x1:2*CELL, y1:2*CELL, x2:8*CELL, y2:2*CELL, esp:6};
+    else if(tipo === 'label') base = {id:newId(), type:'label', x:1, y:1, w:3, h:1, main:'Rótulo', sub:''};
+    else                      base = {id:newId(), type:'equip', x:1, y:1, w:2, h:2, main:'', sub:'', colorIdx:0, formato:'generico', rotacao:0};
+    currentSala().cells.push(base);
+    renderCanvas(); marcarSujo();
+    const el = canvas.querySelector('.mapa-cell[data-id="' + base.id + '"]');
+    if(el) abrirEditor(base, el);
+  }
+  $('#mapa-add-mesa').addEventListener('click', () => adicionar('mesa'));
+  $('#mapa-add-equip').addEventListener('click', () => adicionar('equip'));
+  $('#mapa-add-linha').addEventListener('click', () => adicionar('linha'));
+  $('#mapa-add-label').addEventListener('click', () => adicionar('label'));
+  $('#mapa-clear').addEventListener('click', () => {
+    if(confirm('Remover todos os blocos desta sala?')){
+      currentSala().cells = [];
+      renderCanvas(); marcarSujo();
+    }
+  });
+
+  /* -------------------- impressão ------------------------------- */
+  function areaUsada(cells){
+    // recorta pro pedaço onde tem blocos (+1 célula de margem), pra impressão
+    // não sair minúscula por causa de uma grade grande e vazia
+    if(!cells || !cells.length) return {x:0, y:0, w:10, h:7};
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    cells.forEach(c => {
+      const [ex0, ey0, ex1, ey1] = extremos(c);
+      x0 = Math.min(x0, ex0); y0 = Math.min(y0, ey0);
+      x1 = Math.max(x1, ex1); y1 = Math.max(y1, ey1);
+    });
+    const mx = Math.max(0, x0 - 1), my = Math.max(0, y0 - 1);
+    return {x: mx, y: my, w: (x1 - mx) + 1, h: (y1 - my) + 1};
+  }
+  function montarImpressao(){
+    const cont = $('#mapa-print');
+    cont.innerHTML = '';
+    state.salas.forEach(sala => {
+      const bb = areaUsada(sala.cells);
+      // desenha grande (célula de 64px) e depois ENCOLHE tudo junto pra caber na
+      // folha (A4 paisagem ≈ 1120 x 760 úteis). Os textos compensam a escala via
+      // --pe, então saem legíveis mesmo quando o mapa é grande.
+      const PX = 64;
+      const wpx = bb.w * PX, hpx = bb.h * PX;
+      const escala = Math.min(1, 1120 / wpx, 760 / hpx);
+
+      const sec = document.createElement('section');
+      sec.className = 'mapa-print-sec';
+      const h = document.createElement('h2');
+      h.textContent = sala.nome + (sala.cells && sala.cells.length ? '' : '  (sem blocos)');
+      sec.appendChild(h);
+
+      const fit = document.createElement('div');
+      fit.className = 'mapa-print-fit';
+      fit.style.width = Math.round(wpx * escala) + 'px';
+      fit.style.height = Math.round(hpx * escala) + 'px';
+
+      const cv = document.createElement('div');
+      cv.className = 'mapa-print-canvas';
+      cv.style.width = wpx + 'px';
+      cv.style.height = hpx + 'px';
+      cv.style.backgroundSize = PX + 'px ' + PX + 'px';
+      cv.style.transform = 'scale(' + escala + ')';
+      cv.style.setProperty('--pe', escala);
+      const dxc = bb.x * CELL, dyc = bb.y * CELL;
+      ordenadas(sala.cells).forEach(cell => {
+        const d = cell.type === 'linha'
+          ? {...cell, x1: cell.x1 - dxc, y1: cell.y1 - dyc, x2: cell.x2 - dxc, y2: cell.y2 - dyc}
+          : {...cell, x: cell.x - bb.x, y: cell.y - bb.y};
+        cv.appendChild(elementoCelula(d, {estatico:true, px:PX}));
+      });
+      fit.appendChild(cv);
+      sec.appendChild(fit);
+      cont.appendChild(sec);
+    });
+  }
+  $('#mapa-print-btn').addEventListener('click', () => { montarImpressao(); window.print(); });
+
+  /* -------------------- versões / backup ----------------------- */
+  const painelVersoes = $('#mapa-versoes-painel');
+
+  async function abrirVersoes(){
+    const lista = $('#mapa-versoes-lista');
+    lista.innerHTML = '<li class="vazio">Carregando…</li>';
+    painelVersoes.hidden = false;
+    try{
+      const res = await fetch("{{ url_for('mapa.versoes') }}");
+      const dados = await res.json();
+      const vs = dados.versoes || [];
+      if(!vs.length){ lista.innerHTML = '<li class="vazio">Nenhuma versão guardada ainda (aparece a partir do 2º save).</li>'; return; }
+      lista.innerHTML = '';
+      vs.forEach(v => {
+        const li = document.createElement('li');
+        li.innerHTML = '<span>' + v.quando + '</span>';
+        const b = document.createElement('button');
+        b.className = 'btn ghost pequeno'; b.textContent = 'Restaurar esta';
+        b.addEventListener('click', () => restaurarVersao(v.id, v.quando));
+        li.appendChild(b);
+        lista.appendChild(li);
+      });
+    }catch(e){ lista.innerHTML = '<li class="vazio">Erro ao carregar as versões.</li>'; }
+  }
+  async function restaurarVersao(id, quando){
+    if(!confirm('Restaurar o mapa como estava em ' + quando + '?\n\nO estado atual vai pro histórico também, então dá pra desfazer depois.')) return;
+    try{
+      const res = await fetch("{{ url_for('mapa.restaurar') }}", {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id: id, base_atualizado_em: baseTs}),
+      });
+      const dados = await res.json();
+      if(res.status === 409){
+        if(confirm('O mapa mudou no servidor nesse meio tempo. Restaurar mesmo assim?')){
+          const r2 = await fetch("{{ url_for('mapa.restaurar') }}", {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({id: id}),
+          });
+          const d2 = await r2.json();
+          if(d2.ok){ aplicarLayout(d2.layout, d2.atualizado_em); painelVersoes.hidden = true; statusEl.textContent = 'Restaurado'; }
+        }
+        return;
+      }
+      if(!dados.ok){ alert(dados.erro || 'Não deu pra restaurar.'); return; }
+      aplicarLayout(dados.layout, dados.atualizado_em);
+      painelVersoes.hidden = true;
+      statusEl.textContent = 'Restaurado';
+    }catch(e){ alert('Erro de conexão ao restaurar.'); }
+  }
+  $('#mapa-versoes-btn').addEventListener('click', () => {
+    if(painelVersoes.hidden) abrirVersoes(); else painelVersoes.hidden = true;
+  });
+  $('#mapa-versoes-fechar').addEventListener('click', () => painelVersoes.hidden = true);
+
+  $('#mapa-backup-btn').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(state, null, 1)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const dt = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+    a.download = 'mapa-salas-' + dt + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  });
+
+  $('#mapa-restore-file').addEventListener('change', e => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if(!f) return;
+    const fr = new FileReader();
+    fr.onload = () => {
+      let layout;
+      try{ layout = JSON.parse(fr.result); }
+      catch(err){ alert('Esse arquivo não é um backup de mapa válido.'); return; }
+      if(!layout || !Array.isArray(layout.salas)){ alert('Esse arquivo não parece um backup de mapa.'); return; }
+      if(!confirm('Carregar o mapa desse arquivo? Ele substitui o que está na tela.\n\nClique em "Salvar mapa" depois pra gravar no servidor (o mapa atual do servidor vai pro histórico).')) return;
+      aplicarLayout(layout, baseTs);
+      marcarSujo();
+    };
+    fr.readAsText(f);
+  });
+
+  aplicarGrade();
+  renderTabs();
+  renderCanvas();
+
+  // /mapa/?print — deixa a versão de impressão pronta (útil pra abrir e dar Ctrl+P)
+  if(new URLSearchParams(location.search).has('print')) montarImpressao();
+})();
+</script>
+{% endblock %}

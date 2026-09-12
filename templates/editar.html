@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Editar equipamento{% endblock %}
+{% block page_title %}Editar {{ equipamento.patrimonio }}{% endblock %}
+{% block page_sub %}{{ equipamento.categoria }} · cadastrado em {{ equipamento.data_cadastro }}{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <form action="{{ url_for('equipamentos.editar', patrimonio=equipamento.patrimonio) }}" method="post">
+    <div class="form-grid">
+      <div class="section-label">Identificação</div>
+      <div class="field"><label>Patrimônio</label><input value="{{ equipamento.patrimonio }}" disabled></div>
+      <div class="field"><label>Categoria</label><input value="{{ equipamento.categoria }}" disabled></div>
+      <div class="field"><label for="marca">Marca</label><input id="marca" name="marca" value="{{ equipamento.marca or '' }}"></div>
+      <div class="field"><label for="modelo">Modelo</label><input id="modelo" name="modelo" value="{{ equipamento.modelo or '' }}"></div>
+      <div class="field"><label for="numero_serie">Número de série</label><input id="numero_serie" name="numero_serie" value="{{ equipamento.numero_serie or '' }}"></div>
+      {% if equipamento.categoria != 'Monitor' %}
+      <div class="field"><label for="endereco_mac">Endereço MAC</label><input id="endereco_mac" name="endereco_mac" value="{{ equipamento.endereco_mac or '' }}"></div>
+      {% endif %}
+
+      <div class="section-label">Responsável e localização</div>
+      <div class="field">
+        <label for="responsavel_nome">Responsável</label>
+        <input id="responsavel_nome" name="responsavel_nome" list="lista-funcionarios" value="{{ equipamento.responsavel or '' }}" placeholder="Deixe em branco se ninguém">
+        <datalist id="lista-funcionarios">
+          {% for f in funcionarios %}<option value="{{ f.nome }}">{% endfor %}
+        </datalist>
+      </div>
+      <div class="field"><label for="setor">Setor</label><input id="setor" name="setor" value="{{ equipamento.setor or '' }}"></div>
+      <div class="field"><label for="cargo">Cargo <span style="font-weight:400">(opcional)</span></label><input id="cargo" name="cargo" value="{{ equipamento.cargo or '' }}"></div>
+      <div class="field"><label for="sala">Sala</label><input id="sala" name="sala" value="{{ equipamento.sala or '' }}"></div>
+      <div class="field"><label for="mesa">Mesa</label><input id="mesa" name="mesa" value="{{ equipamento.mesa or '' }}"></div>
+      <div class="field full"><label for="motivo_movimentacao">Motivo da troca <span style="font-weight:400">(se estiver mudando responsável/local)</span></label><input id="motivo_movimentacao" name="motivo_movimentacao"></div>
+
+      <div class="section-label">Status e propriedade</div>
+      <div class="field"><label for="status">Status</label>
+        <select id="status" name="status" required>
+          {% for s in status_lista %}<option value="{{ s.nome }}" {{ 'selected' if s.nome == equipamento.status }}>{{ s.nome }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label for="propriedade">Propriedade</label>
+        <select id="propriedade" name="propriedade">
+          <option value="Empresa" {{ 'selected' if equipamento.propriedade == 'Empresa' }}>Empresa</option>
+          <option value="Particular" {{ 'selected' if equipamento.propriedade == 'Particular' }}>Particular</option>
+        </select>
+      </div>
+      <div class="field"><label for="data_compra">Data de compra <span style="font-weight:400">(opcional)</span></label><input type="date" id="data_compra" name="data_compra" value="{{ equipamento.data_compra or '' }}"></div>
+      <div class="field"><label for="garantia_meses">Garantia (meses) <span style="font-weight:400">(opcional)</span></label><input type="number" id="garantia_meses" name="garantia_meses" min="0" value="{{ equipamento.garantia_meses or '' }}"></div>
+      <div class="field field-check"><input type="checkbox" id="uso_externo" name="uso_externo" {{ 'checked' if equipamento.uso_externo }}><label for="uso_externo" style="font-weight:400">Uso externo (leva pra casa)</label></div>
+      {% if equipamento.data_fim_garantia %}<div class="field full" style="color:var(--text-600); font-size:13px;">Garantia até {{ equipamento.data_fim_garantia }}</div>{% endif %}
+      <div class="field full"><label for="observacao">Observação</label><textarea id="observacao" name="observacao" rows="3">{{ equipamento.observacao or '' }}</textarea></div>
+    </div>
+    <div class="form-actions">
+      <a href="{{ url_for('ocorrencias.por_equipamento', patrimonio=equipamento.patrimonio) }}" class="btn ghost">Ver ocorrências</a>
+      <a href="{{ url_for('fotos.listar', patrimonio=equipamento.patrimonio) }}" class="btn ghost">Ver fotos</a>
+      <span class="spacer"></span>
+      <a href="{{ url_for('equipamentos.listar') }}" class="btn ghost">Cancelar</a>
+      <input type="submit" class="btn gold" value="Salvar alterações">
+    </div>
+  </form>
+</div>
+{% endblock %}

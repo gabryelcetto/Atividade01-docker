@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Funcionários excluídos{% endblock %}
+{% block page_title %}Funcionários excluídos{% endblock %}
+{% block page_sub %}{{ funcionarios|length }} excluído(s){% endblock %}
+{% block topbar_extra %}
+<a href="{{ url_for('funcionarios.listar') }}" class="btn ghost">Voltar</a>
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <div class="tabela-scroll">
+  <table>
+    <thead><tr><th>Nome</th><th>Setor</th><th>Cargo</th><th>Excluído em</th><th></th></tr></thead>
+    <tbody class="stagger">
+    {% for f in funcionarios %}
+    <tr>
+      <td>{{ f.nome }}</td>
+      <td>{{ f.setor or '' }}</td>
+      <td>{{ f.cargo or '' }}</td>
+      <td>{{ f.excluido_em.strftime('%d/%m/%Y %H:%M') if f.excluido_em else '' }}</td>
+      <td>
+        <form action="{{ url_for('funcionarios.restaurar', id_=f.id) }}" method="post">
+          <input type="submit" class="btn gold" value="Restaurar">
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5">Nenhum funcionário excluído.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

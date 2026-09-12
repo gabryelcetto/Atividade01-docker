@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UVV — Controle de Equipamentos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+<body>
+
+<div id="cursor-ring"></div>
+<div id="cursor-dot"></div>
+
+<div id="cover">
+  <canvas id="cover-canvas"></canvas>
+  <div class="cover-nav">
+    <div class="mark">UVV</div>
+    <div>SISTEMA DE EQUIPAMENTOS</div>
+  </div>
+  <div class="cover-tagline" id="cover-tagline">CONTROLE DE EQUIPAMENTOS</div>
+  <div class="cover-enter" id="cover-enter"><span id="enter-btn">Entrar no sistema &rarr;</span></div>
+</div>
+
+<script>
+/* ---------------- cursor customizado ---------------- */
+(function(){
+  const ring = document.getElementById('cursor-ring');
+  const dot = document.getElementById('cursor-dot');
+  let rx=0, ry=0, mx=0, my=0;
+  window.addEventListener('mousemove', e=>{
+    mx=e.clientX; my=e.clientY;
+    dot.style.left=mx+'px'; dot.style.top=my+'px';
+  });
+  (function loop(){
+    rx += (mx-rx)*0.18; ry += (my-ry)*0.18;
+    ring.style.left=rx+'px'; ring.style.top=ry+'px';
+    requestAnimationFrame(loop);
+  })();
+  document.getElementById('enter-btn').addEventListener('mouseenter', ()=>document.body.classList.add('cursor-grow'));
+  document.getElementById('enter-btn').addEventListener('mouseleave', ()=>document.body.classList.remove('cursor-grow'));
+})();
+
+/* ---------------- ir direto pro dashboard se já entrou nesta sessão ---------------- */
+if (sessionStorage.getItem('uvv_entrou') === '1') {
+  window.location.replace("{{ url_for('dashboard.inicio') }}");
+}
+
+function entrarNoSistema(){
+  sessionStorage.setItem('uvv_entrou', '1');
+  window.location.href = "{{ url_for('dashboard.inicio') }}";
+}
+
+/* ---------------- LOGO EM PARTICULAS (cover) ---------------- */
+function textoParaPontos(texto){
+  // Desenha o texto num canvas 2D e amostra os pixels visiveis: cada pixel
+  // acima do limiar de opacidade vira um ponto normalizado (-1..1). Assim a
+  // nuvem de particulas nasce de qualquer string, sem dataset desenhado a mao.
+  const cv = document.createElement('canvas');
+  const ctx = cv.getContext('2d');
+  const alturaFonte = 260;
+  ctx.font = `700 ${alturaFonte}px Inter, sans-serif`;
+  const largura = Math.ceil(ctx.measureText(texto).width) + 60;
+  const altura = Math.round(alturaFonte * 1.4);
+  cv.width = largura;
+  cv.height = altura;
+  ctx.font = `700 ${alturaFonte}px Inter, sans-serif`;
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(texto, largura / 2, altura / 2);
+
+  const { data } = ctx.getImageData(0, 0, largura, altura);
+  const passo = 5;
+  const pontos = [];
+  for (let y = 0; y < altura; y += passo) {
+    for (let x = 0; x < largura; x += passo) {
+      if (data[(y * largura + x) * 4 + 3] > 128) {
+        pontos.push([(x / largura - 0.5) * 2.6, -(y / altura - 0.5) * 1.1]);
+      }
+    }
+  }
+  return pontos;
+}
+const LOGO_POINTS = textoParaPontos('UVV');
+
+(function(){
+try{
+  const canvas = document.getElementById('cover-canvas');
+  const renderer = new THREE.WebGLRenderer({canvas, alpha:true, antialias:true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,3));
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 100);
+  camera.position.z = 6;
+
+  // Densidade extra: cada ponto original ganha pontos vizinhos com leve jitter,
+  // deixando o logo visualmente mais denso/nítido sem precisar de mais amostragem.
+  const RESOLUCAO_EXTRA = 2;
+  const PONTOS = [];
+  for (const p of LOGO_POINTS) {
+    PONTOS.push(p);
+    for (let k = 1; k < RESOLUCAO_EXTRA; k++) {
+      PONTOS.push([
+        p[0] + (Math.random() - 0.5) * 0.012,
+        p[1] + (Math.random() - 0.5) * 0.012,
+      ]);
+    }
+  }
+
+  const n = PONTOS.length;
+  const targetPos = new Float32Array(n*3);
+  const startPos = new Float32Array(n*3);
+  const scale = 1.6;
+  const deslocamentoY = 0.35; // sobe o logo um pouco na tela
+  for(let i=0;i<n;i++){
+    targetPos[i*3]   = PONTOS[i][0]*scale;
+    targetPos[i*3+1] = PONTOS[i][1]*scale + deslocamentoY;
+    targetPos[i*3+2] = (Math.random()-0.5)*0.3;
+    startPos[i*3]    = (Math.random()-0.5)*16;
+    startPos[i*3+1]  = (Math.random()-0.5)*10 + deslocamentoY;
+    startPos[i*3+2]  = (Math.random()-0.5)*6;
+  }
+
+  function criarTexturaPonto(){
+    const tam = 64;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = tam;
+    const ctx = cv.getContext('2d');
+    const grad = ctx.createRadialGradient(tam/2,tam/2,0,tam/2,tam/2,tam/2);
+    grad.addColorStop(0,'rgba(255,255,255,1)');
+    grad.addColorStop(0.45,'rgba(255,255,255,0.85)');
+    grad.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,tam,tam);
+    return new THREE.CanvasTexture(cv);
+  }
+  const texturaPonto = criarTexturaPonto();
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(startPos.slice(),3));
+  const material = new THREE.PointsMaterial({
+    color:0xD9B57B, size:0.055, map:texturaPonto, alphaTest:0.01,
+    transparent:true, opacity:1, depthWrite:false
+  });
+  const points = new THREE.Points(geometry, material);
+
+  const glowGeometry = new THREE.BufferGeometry();
+  glowGeometry.setAttribute('position', new THREE.BufferAttribute(startPos.slice(),3));
+  const glowMaterial = new THREE.PointsMaterial({
+    color:0xC9A063, size:0.16, map:texturaPonto, alphaTest:0.01, transparent:true, opacity:0.25,
+    blending:THREE.AdditiveBlending, depthWrite:false
+  });
+  const glowPoints = new THREE.Points(glowGeometry, glowMaterial);
+  const glowPosAttr = glowGeometry.attributes.position;
+
+  const logoGroup = new THREE.Group();
+  logoGroup.add(points);
+  logoGroup.add(glowPoints);
+  scene.add(logoGroup);
+
+  const posAttr = geometry.attributes.position;
+  const progress = {t:0};
+  gsap.to(progress, {
+    t:1, duration:2.2, delay:0.5, ease:'power3.out',
+    onUpdate:()=>{
+      for(let i=0;i<n;i++){
+        posAttr.array[i*3]   = startPos[i*3]   + (targetPos[i*3]-startPos[i*3])*progress.t;
+        posAttr.array[i*3+1] = startPos[i*3+1] + (targetPos[i*3+1]-startPos[i*3+1])*progress.t;
+        posAttr.array[i*3+2] = startPos[i*3+2] + (targetPos[i*3+2]-startPos[i*3+2])*progress.t;
+        glowPosAttr.array[i*3]   = posAttr.array[i*3];
+        glowPosAttr.array[i*3+1] = posAttr.array[i*3+1];
+        glowPosAttr.array[i*3+2] = posAttr.array[i*3+2];
+      }
+      posAttr.needsUpdate = true;
+      glowPosAttr.needsUpdate = true;
+    }
+  });
+
+  let mouseWorldX = 999, mouseWorldY = 999;
+  window.addEventListener('mousemove', e=>{
+    const ndcX = (e.clientX/window.innerWidth - 0.5)*2;
+    const ndcY = -(e.clientY/window.innerHeight - 0.5)*2;
+    const halfH = camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov/2));
+    const halfW = halfH * camera.aspect;
+    mouseWorldX = ndcX*halfW;
+    mouseWorldY = ndcY*halfH;
+  });
+
+  const REPEL_RADIUS = 0.42;
+  const REPEL_STRENGTH = 1.4;
+
+  let t=0;
+  function animate(){
+    requestAnimationFrame(animate);
+    t += 0.01;
+    logoGroup.rotation.y = Math.sin(t*0.3)*0.035;
+
+    if(progress.t > 0.98){
+      for(let i=0;i<n;i++){
+        const bx = targetPos[i*3];
+        const by = targetPos[i*3+1];
+        const bz = targetPos[i*3+2] + Math.sin(t+i)*0.01;
+        const dx = bx - mouseWorldX;
+        const dy = by - mouseWorldY;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        let ox = bx, oy = by;
+        if(dist < REPEL_RADIUS){
+          const force = (1 - dist/REPEL_RADIUS);
+          const nx = dist>0.0001 ? dx/dist : (Math.random()-0.5);
+          const ny = dist>0.0001 ? dy/dist : (Math.random()-0.5);
+          ox = bx + nx*force*REPEL_STRENGTH;
+          oy = by + ny*force*REPEL_STRENGTH;
+        }
+        posAttr.array[i*3]   += (ox - posAttr.array[i*3])*0.16;
+        posAttr.array[i*3+1] += (oy - posAttr.array[i*3+1])*0.16;
+        posAttr.array[i*3+2] = bz;
+        glowPosAttr.array[i*3]   = posAttr.array[i*3];
+        glowPosAttr.array[i*3+1] = posAttr.array[i*3+1];
+        glowPosAttr.array[i*3+2] = bz;
+      }
+      posAttr.needsUpdate = true;
+      glowPosAttr.needsUpdate = true;
+    }
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', ()=>{
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+}catch(err){
+  console.error('Falha ao iniciar o fundo em partículas (Three.js):', err);
+}
+})();
+
+gsap.to('#cover-tagline', {opacity:1, duration:1, delay:2.3, ease:'power2.out'});
+gsap.to('#cover-enter', {opacity:1, duration:1, delay:2.6, ease:'power2.out'});
+document.getElementById('enter-btn').addEventListener('click', entrarNoSistema);
+</script>
+</body>
+</html>

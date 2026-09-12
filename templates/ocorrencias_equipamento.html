@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Ocorrências — {{ equipamento.patrimonio }}{% endblock %}
+{% block page_title %}Ocorrências — {{ equipamento.patrimonio }}{% endblock %}
+{% block page_sub %}{{ equipamento.marca or '' }} {{ equipamento.modelo or '' }}{% endblock %}
+{% block topbar_extra %}
+<a href="{{ url_for('equipamentos.editar', patrimonio=equipamento.patrimonio) }}" class="btn ghost">Voltar ao equipamento</a>
+<a href="{{ url_for('ocorrencias.nova', patrimonio=equipamento.patrimonio) }}" class="btn gold">+ Abrir ocorrência</a>
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <div class="tabela-scroll">
+  <table>
+    <thead><tr><th>Problema</th><th>Descrição</th><th>Status</th><th>Relatado por</th><th>Abertura</th><th>Solução</th><th>Técnico</th><th>Resolução</th><th></th></tr></thead>
+    <tbody class="stagger">
+    {% for o in ocorrencias %}
+    <tr>
+      <td>{{ o.problema_relatado }}</td>
+      <td>{{ o.descricao or '' }}</td>
+      <td>{{ m.badge_ocorrencia(o.status) }}</td>
+      <td>{{ o.funcionario or '—' }}</td>
+      <td>{{ o.data_abertura.strftime('%d/%m/%Y %H:%M') }}</td>
+      <td>{{ o.solucao_aplicada or '' }}</td>
+      <td>{{ o.tecnico_responsavel or '' }}</td>
+      <td>{{ o.data_resolucao.strftime('%d/%m/%Y %H:%M') if o.data_resolucao else '' }}</td>
+      <td>{% if o.status != 'Resolvido' %}<a href="{{ url_for('ocorrencias.resolver', id_=o.id) }}" class="btn gold">Resolver</a>{% endif %}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9">Nenhuma ocorrência registrada pra este equipamento ainda.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

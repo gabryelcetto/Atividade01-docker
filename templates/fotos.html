@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Fotos — {{ equipamento.patrimonio }}{% endblock %}
+{% block page_title %}Fotos — {{ equipamento.patrimonio }}{% endblock %}
+{% block page_sub %}{{ equipamento.marca or '' }} {{ equipamento.modelo or '' }}{% endblock %}
+{% block topbar_extra %}
+<a href="{{ url_for('equipamentos.editar', patrimonio=equipamento.patrimonio) }}" class="btn ghost">Voltar ao equipamento</a>
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <div class="panel-head"><h2>Fotos enviadas</h2></div>
+  <div class="grade-fotos">
+    {% for f in fotos %}
+    <div class="foto-item">
+      <a href="{{ url_foto(f.caminho_arquivo) }}" target="_blank">
+        <img src="{{ url_foto(f.caminho_arquivo) }}" alt="foto do equipamento" loading="lazy">
+      </a>
+      <p>{{ 'Cadastro' if f.tipo == 'cadastro' else 'Problema' }} · {{ f.data_upload.strftime('%d/%m/%Y') }}</p>
+      <form action="{{ url_for('fotos.excluir', patrimonio=equipamento.patrimonio, foto_id=f.id) }}" method="post"
+            onsubmit="return confirm('Remover esta foto?');">
+        <button type="submit" class="btn ghost pequeno">Remover</button>
+      </form>
+    </div>
+    {% else %}
+    <p style="color:var(--text-600);">Nenhuma foto enviada ainda.</p>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <h2>Enviar nova foto</h2>
+    <span class="uso-armazenamento" title="{{ 'Bucket R2' if armazenamento_info.modo == 's3' else 'Disco local' }}">
+      {{ '%.0f'|format(armazenamento_info.usado_mb) }} MB de {{ '%.0f'|format(armazenamento_info.teto_mb) }} MB
+      ({{ '%.1f'|format(armazenamento_info.pct) }}%)
+    </span>
+  </div>
+  <form action="{{ url_for('fotos.listar', patrimonio=equipamento.patrimonio) }}" method="post" enctype="multipart/form-data">
+    <div class="form-grid">
+      <div class="field full"><label for="arquivo">Arquivo (jpg, png, gif ou webp)</label>
+        <input type="file" id="arquivo" name="arquivo" accept="image/*" required></div>
+      <div class="field"><label for="tipo">Tipo</label>
+        <select id="tipo" name="tipo">
+          <option value="cadastro">Foto de cadastro</option>
+          <option value="problema">Foto de problema</option>
+        </select>
+      </div>
+      <div class="field"><label for="ocorrencia_id">Ligar a uma ocorrência <span style="font-weight:400">(se for foto de problema)</span></label>
+        <select id="ocorrencia_id" name="ocorrencia_id">
+          <option value="">— nenhuma —</option>
+          {% for o in ocorrencias %}<option value="{{ o.id }}">#{{ o.id }} — {{ o.problema_relatado }} ({{ o.status }})</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <input type="submit" class="btn gold" value="Enviar foto">
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Funcionários{% endblock %}
+{% block page_title %}Funcionários{% endblock %}
+{% block page_sub %}{{ funcionarios|length }} ativo(s){% endblock %}
+{% block topbar_extra %}
+<form class="search" action="{{ url_for('funcionarios.listar') }}" method="get">
+  {% if setor %}<input type="hidden" name="setor" value="{{ setor }}">{% endif %}
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+  <input name="busca" value="{{ termo }}" placeholder="Buscar por nome, cargo...">
+</form>
+<a href="{{ url_for('funcionarios.excluidos') }}" class="btn ghost">Ver excluídos</a>
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <div class="panel-head">
+    <h2>Todos os funcionários</h2>
+    <form action="{{ url_for('funcionarios.listar') }}" method="get">
+      {% if termo %}<input type="hidden" name="busca" value="{{ termo }}">{% endif %}
+      <select name="setor" class="btn ghost" onchange="this.form.submit()">
+        <option value="">Todos os setores</option>
+        {% for s in setores %}<option value="{{ s }}" {{ 'selected' if setor == s }}>{{ s }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+  <div class="tabela-scroll">
+  <table>
+    <thead><tr><th>Nome</th><th>Setor</th><th>Cargo</th><th>E-mail</th><th>Telefone</th><th></th><th></th></tr></thead>
+    <tbody class="stagger">
+    {% for f in funcionarios %}
+    <tr>
+      <td><a href="{{ url_for('funcionarios.detalhe', id_=f.id) }}">{{ f.nome }}</a></td>
+      <td>{{ f.setor or '' }}</td>
+      <td>{{ f.cargo or '' }}</td>
+      <td>{{ f.email or '' }}</td>
+      <td>{{ f.telefone or '' }}</td>
+      <td><a href="{{ url_for('funcionarios.editar', id_=f.id) }}" class="btn ghost">Editar</a></td>
+      <td>
+        <form action="{{ url_for('funcionarios.excluir', id_=f.id) }}" method="post"
+              onsubmit="return confirm('Excluir {{ f.nome }}? Dá pra restaurar depois.');">
+          <input type="submit" class="btn danger" value="Excluir">
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7">Nenhum funcionário encontrado.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

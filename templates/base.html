@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}UVV{% endblock %} — Equipamentos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+{% block head %}{% endblock %}
+</head>
+<body>
+
+<div id="cursor-ring"></div>
+<div id="cursor-dot"></div>
+
+<div id="app">
+  <div class="sidebar">
+    <div class="brand">
+      <div class="brand-logo-chip"><span class="brand-logo-text">UVV</span></div>
+      <div class="brand-sub">EQUIPAMENTOS</div>
+    </div>
+    <nav id="appnav">
+      <div class="nav-pill" id="nav-pill"></div>
+      {% for item in [
+        ('dashboard', url_for('dashboard.inicio'), 'Dashboard', '<rect x=\"3\" y=\"3\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"5\" rx=\"1\"/><rect x=\"14\" y=\"12\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"3\" y=\"16\" width=\"7\" height=\"5\" rx=\"1\"/>'),
+        ('equipamentos', url_for('equipamentos.listar'), 'Equipamentos', '<rect x=\"2\" y=\"4\" width=\"20\" height=\"13\" rx=\"2\"/><path d=\"M8 21h8M12 17v4\"/>'),
+        ('cadastro', url_for('equipamentos.cadastro'), 'Cadastrar', '<path d=\"M12 5v14M5 12h14\"/>'),
+        ('funcionarios', url_for('funcionarios.listar'), 'Funcionários', '<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75\"/>'),
+        ('ocorrencias', url_for('ocorrencias.listar_abertas'), 'Ocorrências', '<path d=\"M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z\"/><path d=\"M12 9v4M12 17h.01\"/>'),
+        ('mapa', url_for('mapa.ver'), 'Mapa das Salas', '<path d=\"M9 20 3 17V4l6 3m0 13 6-3m-6 3V7m6 10 6 3V7l-6-3m0 13V4m0 0L9 7\"/>'),
+      ] %}
+      <a href="{{ item[1] }}" class="nav-item {{ 'active' if nav_ativo == item[0] else '' }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">{{ item[3]|safe }}</svg>
+        <span>{{ item[2] }}</span>
+      </a>
+      {% endfor %}
+    </nav>
+    <div class="sidebar-foot">UVV &copy; 2026</div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div><h1>{% block page_title %}{% endblock %}</h1><div class="sub">{% block page_sub %}{% endblock %}</div></div>
+      <div class="topbar-right">
+        {% block topbar_extra %}{% endblock %}
+        <div class="avatar">TI</div>
+      </div>
+    </div>
+    <div class="content">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</div>
+
+{% with mensagens = get_flashed_messages(with_categories=true) %}
+  {% for categoria, texto in mensagens %}
+  <div class="toast {{ 'erro' if categoria == 'erro' else '' }}" data-toast>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      {% if categoria == 'erro' %}<path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      {% else %}<path d="M20 6 9 17l-5-5"/>{% endif %}
+    </svg>
+    {{ texto }}
+  </div>
+  {% endfor %}
+{% endwith %}
+
+<script>
+/* ---------------- cursor customizado ---------------- */
+(function(){
+  const ring = document.getElementById('cursor-ring');
+  const dot = document.getElementById('cursor-dot');
+  let rx=0, ry=0, mx=0, my=0;
+  window.addEventListener('mousemove', e=>{
+    mx=e.clientX; my=e.clientY;
+    dot.style.left=mx+'px'; dot.style.top=my+'px';
+  });
+  (function loop(){
+    rx += (mx-rx)*0.18; ry += (my-ry)*0.18;
+    ring.style.left=rx+'px'; ring.style.top=ry+'px';
+    requestAnimationFrame(loop);
+  })();
+  document.querySelectorAll('a,button,.btn,.nav-item,input,select,textarea').forEach(el=>{
+    el.addEventListener('mouseenter', ()=>document.body.classList.add('cursor-grow'));
+    el.addEventListener('mouseleave', ()=>document.body.classList.remove('cursor-grow'));
+  });
+})();
+
+/* ---------------- pílula deslizante do menu ---------------- */
+(function(){
+  const active = document.querySelector('.nav-item.active');
+  if(!active) return;
+  const pill = document.getElementById('nav-pill');
+  const navRect = document.getElementById('appnav').getBoundingClientRect();
+  const r = active.getBoundingClientRect();
+  pill.style.top = (r.top - navRect.top) + 'px';
+})();
+
+/* ---------------- entrada das linhas de tabela ---------------- */
+document.querySelectorAll('tbody.stagger').forEach(tbody=>{
+  tbody.querySelectorAll('tr').forEach((r,i)=> setTimeout(()=>r.classList.add('in'), 30*i));
+});
+
+/* ---------------- contadores dos KPIs ---------------- */
+document.querySelectorAll('#kpis .kpi[data-value]').forEach((kpi,i)=>{
+  const target = parseInt(kpi.dataset.value, 10) || 0;
+  const valueEl = kpi.querySelector('.value');
+  if(typeof gsap === 'undefined'){ valueEl.textContent = target; return; }
+  let obj = {v:0};
+  gsap.to(obj, { v:target, duration:.9, delay:i*0.06, ease:'power2.out',
+    onUpdate:()=>{ valueEl.textContent = Math.round(obj.v); } });
+});
+
+/* ---------------- toast (mensagens flash) ---------------- */
+document.querySelectorAll('[data-toast]').forEach((toast, i)=>{
+  if(typeof gsap === 'undefined'){ toast.style.transform='none'; toast.style.opacity='1'; return; }
+  gsap.to(toast, {x:0, opacity:1, duration:.4, delay:.2+i*0.1, ease:'power2.out'});
+  setTimeout(()=>{ gsap.to(toast, {x:'120%', opacity:0, duration:.4, ease:'power2.in'}); }, 4200+i*300);
+});
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

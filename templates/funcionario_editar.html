@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Editar {{ funcionario.nome }}{% endblock %}
+{% block page_title %}Editar funcionário{% endblock %}
+{% block page_sub %}{{ funcionario.nome }}{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <form action="{{ url_for('funcionarios.editar', id_=funcionario.id) }}" method="post">
+    <div class="form-grid">
+      <div class="field"><label for="nome">Nome</label><input id="nome" name="nome" value="{{ funcionario.nome }}" required></div>
+      <div class="field"><label for="setor">Setor</label><input id="setor" name="setor" value="{{ funcionario.setor or '' }}"></div>
+      <div class="field"><label for="cargo">Cargo</label><input id="cargo" name="cargo" value="{{ funcionario.cargo or '' }}"></div>
+      <div class="field"><label for="email">E-mail</label><input type="email" id="email" name="email" value="{{ funcionario.email or '' }}"></div>
+      <div class="field"><label for="telefone">Telefone</label><input id="telefone" name="telefone" value="{{ funcionario.telefone or '' }}"></div>
+    </div>
+    <div class="form-actions">
+      <a href="{{ url_for('funcionarios.detalhe', id_=funcionario.id) }}" class="btn ghost">Cancelar</a>
+      <input type="submit" class="btn gold" value="Salvar alterações">
+    </div>
+  </form>
+</div>
+{% endblock %}
