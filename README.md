@@ -1,5 +1,10 @@
 # Controle de Equipamentos — UVV
 
+> **Acesso:** com os containers no ar (`docker compose up -d`), a aplicação
+> fica em **http://localhost:5000**. Não rode `app.py` direto (fora do
+> Docker) — ele não alcança o banco (`db` só resolve dentro da rede Docker) e
+> só serve pra confundir com um erro parecido.
+
 Projeto da disciplina **DEVOPS Tools** (Prof. Renato Sousa Botacim) — Universidade
 Vila Velha. Aplicação web conteinerizada com Docker: Flask + MySQL, cada um no seu
 container, comunicando-se por uma rede Docker, com persistência de dados em volume.

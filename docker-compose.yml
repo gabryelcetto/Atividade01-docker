@@ -14,7 +14,13 @@ services:
     networks:
       - rede_equipamentos
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      # "-h localhost" faz o mysqladmin conectar pelo socket Unix local, que já
+      # responde durante o servidor temporário que o MySQL sobe só pra rodar os
+      # scripts de init (schema/seed) — isso marcava o container como "healthy"
+      # antes do servidor definitivo estar escutando em 3306, e o `web` subia
+      # cedo demais e falhava ao conectar. Forçar TCP na porta 3306 garante que
+      # o healthcheck só passa quando o MySQL real (não o temporário) está pronto.
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-P", "3306", "--protocol=TCP", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 10

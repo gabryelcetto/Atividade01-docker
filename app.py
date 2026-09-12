@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask, flash, redirect, render_template, request, url_for
 
 from config import Config
@@ -69,4 +71,12 @@ app = criar_app()
 
 # garante que o servidor seja ligado apenas se executar esse arquivo diretamente.
 if __name__ == "__main__":
-    app.run(debug=app.config["DEBUG"])
+    # Porta diferente de 5000 (a publicada pelo container `web` no
+    # docker-compose.yml) de propósito: se alguém rodar `python app.py` ou dar
+    # F5/Run no VSCode com o projeto no ar via Docker, esse processo local
+    # bindando em 127.0.0.1:5000 tomaria a frente do container pra qualquer
+    # request a "localhost:5000" (bind em endereço específico ganha do bind
+    # coringa 0.0.0.0/:: do Docker) — e como esse processo local não está na
+    # rede do Docker, `DB_HOST=db` não resolve e toda página vira 500,
+    # parecendo (incorretamente) um problema no container.
+    app.run(debug=app.config["DEBUG"], port=int(os.getenv("LOCAL_DEV_PORT", "5001")))

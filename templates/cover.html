@@ -55,23 +55,29 @@ function entrarNoSistema(){
 }
 
 /* ---------------- LOGO EM PARTICULAS (cover) ---------------- */
-function textoParaPontos(texto){
-  // Desenha o texto num canvas 2D e amostra os pixels visiveis: cada pixel
+function textoParaPontos(linhas){
+  // Desenha o(s) texto(s) num canvas 2D e amostra os pixels visiveis: cada pixel
   // acima do limiar de opacidade vira um ponto normalizado (-1..1). Assim a
-  // nuvem de particulas nasce de qualquer string, sem dataset desenhado a mao.
+  // nuvem de particulas nasce de qualquer string (ou lista de linhas), sem
+  // dataset desenhado a mao.
+  const linhasArr = Array.isArray(linhas) ? linhas : [linhas];
   const cv = document.createElement('canvas');
   const ctx = cv.getContext('2d');
-  const alturaFonte = 260;
+  const alturaFonte = 130;
   ctx.font = `700 ${alturaFonte}px Inter, sans-serif`;
-  const largura = Math.ceil(ctx.measureText(texto).width) + 60;
-  const altura = Math.round(alturaFonte * 1.4);
+  const largura = Math.ceil(Math.max(...linhasArr.map(l => ctx.measureText(l).width))) + 60;
+  const alturaLinha = alturaFonte * 1.15;
+  const altura = Math.round(alturaLinha * linhasArr.length + alturaFonte * 0.5);
   cv.width = largura;
   cv.height = altura;
   ctx.font = `700 ${alturaFonte}px Inter, sans-serif`;
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(texto, largura / 2, altura / 2);
+  const inicioY = (altura - alturaLinha * (linhasArr.length - 1)) / 2;
+  linhasArr.forEach((linha, i) => {
+    ctx.fillText(linha, largura / 2, inicioY + alturaLinha * i);
+  });
 
   const { data } = ctx.getImageData(0, 0, largura, altura);
   const passo = 5;
@@ -85,7 +91,7 @@ function textoParaPontos(texto){
   }
   return pontos;
 }
-const LOGO_POINTS = textoParaPontos('UVV');
+const LOGO_POINTS = textoParaPontos(['Bem vindo', 'Renatão']);
 
 (function(){
 try{
